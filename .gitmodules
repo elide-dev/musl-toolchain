@@ -22,4 +22,3 @@
 	path = sqlite
 	url = git@github.com:sqlite/sqlite.git
 	ignore = dirty
-	shallow = true
