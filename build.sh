@@ -77,6 +77,12 @@ make clean && \
     ADD_CFI=$CFI \
     | tee buildlog.txt;
 
+# Debug: Check detected architecture
+echo "=== Musl Configuration ==="
+grep "^ARCH" config.mak
+echo "Expected: ARCH = $(uname -m)"
+echo "=========================="
+
 make install;
 popd;
 
@@ -135,7 +141,6 @@ fi
 
 make clean && \
   ./configure \
-    --target=$MUSL_TARGET \
     --prefix=$ROOT_DIR/1.2.5 \
     --enable-optimize=internal,malloc,string \
   && make -j${JOBS} \
