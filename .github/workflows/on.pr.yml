@@ -33,7 +33,6 @@ jobs:
         with:
           submodules: false
           fetch-depth: 1
-          persist-credentials: false
       - name: "Setup: Submodules"
         run: rm -fr sqlite && git submodule update --init --depth=1 && git submodule update --init --recursive --depth=1 sqlite
       - name: "Setup: Sccache"
