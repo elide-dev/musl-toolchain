@@ -40,14 +40,14 @@ mkdir -p ./1.2.5/include/asm-generic
 cp -r /usr/include/linux/* ./1.2.5/include/linux/
 cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
 
-# Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
-cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
-
 # if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-musl
 if [ "$ARCH_FLAVOR" = "amd64" ]; then
   LINUX_ARCH_DIR="x86_64-linux-musl"
+  # Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
+  cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
 else
   LINUX_ARCH_DIR="aarch64-linux-musl"
+  cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
 fi
 
 # Verify you got what you need
