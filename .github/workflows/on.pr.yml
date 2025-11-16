@@ -31,9 +31,11 @@ jobs:
       - name: "Setup: Checkout"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          submodules: true
+          submodules: false
           fetch-depth: 1
           persist-credentials: false
+      - name: "Setup: Submodules"
+        run: git submodule update --init --depth=1 && git submodule update --init --recursive --depth=1 sqlite
       - name: "Setup: Sccache"
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
       - name: "Build: Toolchain"
