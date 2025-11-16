@@ -18,3 +18,8 @@
 	url = git@github.com:cloudflare/zlib.git
 	ignore = dirty
 	shallow = true
+[submodule "sqlite"]
+	path = sqlite
+	url = git@github.com:sqlite/sqlite.git
+	ignore = dirty
+	shallow = true

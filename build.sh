@@ -5,6 +5,7 @@
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
+# - SQLite: master branch as of Nov 2025
 
 set -e -x
 
@@ -21,6 +22,7 @@ ROOT_DIR=$PWD
 
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
+BUILD_SQLITE=${BUILD_SQLITE:-yes}
 
 unset CC
 unset CFLAGS
@@ -184,8 +186,7 @@ else
   git clean -xdf
   make clean || echo "No clean step";
   rm -fv buildlog.txt;
-  export CFLAGS="$CFLAGS -fPIE"
-  export LDFLAGS="$LDFLAGS -pie"
+  export CFLAGS="$CFLAGS -fPIE -fPIC"
 
   # no-shared \
   # no-tests \
@@ -216,6 +217,31 @@ else
   make -j$JOBS depend
   make -j$JOBS | tee buildlog.txt;
   make install_sw install_ssldirs;
+  popd;
+fi
+
+### Build sqlite
+
+if [ "$BUILD_SQLITE" != "yes" ]; then
+  echo "Skipping sqlite build.";
+else
+  echo "------- Building sqlite...";
+  pushd sqlite;
+  git checkout .
+  git clean -xdf
+  make clean || echo "No clean step";
+  rm -fv buildlog.txt;
+
+  ./configure \
+    --prefix=$ROOT_DIR/1.2.5 \
+    --enable-all \
+    --enable-static \
+    --enable-fts5 \
+    --enable-threadsafe \
+    --disable-shared;
+
+  make -j$JOBS | tee buildlog.txt;
+  make install;
   popd;
 fi
 
@@ -258,6 +284,9 @@ if [ "$BUILD_ZLIB" = "yes" ]; then
 fi
 if [ "$BUILD_OPENSSL" = "yes" ]; then
   echo "  openssl:    3.6.0 $(file $ROOT_DIR/1.2.5/lib64/libssl.a)"
+fi
+if [ "$BUILD_SQLITE" = "yes" ]; then
+  echo "  sqlite:     master $(file $ROOT_DIR/1.2.5/lib/libsqlite3.a)"
 fi
 echo ""
 echo "Features:"
