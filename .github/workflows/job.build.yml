@@ -21,11 +21,11 @@ jobs:
           - arch: amd64
             target: x86-64-v4
             tune: znver4
-            runner: ubuntu-latest-16-cores
+            runner: linux-amd64-cipool
           - arch: arm64
             target: armv8.4-a+crypto+sve
             tune: neoverse-v1
-            runner: ubuntu-latest-16-cores-arm64
+            runner: linux-arm64-cipool
     steps:
       - name: "Setup: Harden Runner"
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
