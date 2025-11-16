@@ -23,5 +23,7 @@ jobs:
           submodules: true
           fetch-depth: 1
           persist-credentials: false
+      - name: "Setup: Sccache"
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
       - name: "Build: Toolchain"
         run: ./build.sh
