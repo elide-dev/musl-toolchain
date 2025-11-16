@@ -18,7 +18,7 @@ MAKE_SYMLINK=${MAKE_SYMLINK:-no}
 JOBS=`nproc`
 ARCH_FLAVOR=${ARCH_FLAVOR:-amd64}
 C_TARGET_ARCH=${C_TARGET_ARCH:-x86-64-v4}
-C_TARGET_TUNE=${C_TARGET_TUNE:-znver4}
+C_TARGET_TUNE=${C_TARGET_TUNE:-znver3}
 ROOT_DIR=$PWD
 
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
@@ -278,7 +278,8 @@ echo "-----------------------------------------------"
 echo "Musl Sysroot (1.2.5-patched.2):"
 echo "  Location: $ROOT_DIR/1.2.5"
 echo "  Compiler: $MUSL_GCC"
-echo "  Arch:     $TARGET_ARCH"
+echo "  Arch:     $C_TARGET_ARCH"
+echo "  Tune:     $C_TARGET_TUNE"
 echo ""
 echo "Compiler flags:"
 echo "  CFLAGS:   -I$ROOT_DIR/1.2.5/include"
