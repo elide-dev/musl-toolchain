@@ -1,12 +1,20 @@
 [submodule "musl"]
 	path = musl
 	url = git@github.com:elide-tools/musl.git
+	ignore = dirty
+	shallow = true
 [submodule "mimalloc"]
 	path = mimalloc
 	url = git@github.com:microsoft/mimalloc.git
+	ignore = dirty
+	shallow = true
 [submodule "openssl"]
 	path = openssl
 	url = git@github.com:openssl/openssl.git
+	ignore = dirty
+	shallow = true
 [submodule "zlib"]
 	path = zlib
 	url = git@github.com:cloudflare/zlib.git
+	ignore = dirty
+	shallow = true
