@@ -5,7 +5,7 @@
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
-# - SQLite: master branch as of Nov 2025
+# - SQLite: 3.51.0
 
 set -e -x
 
@@ -295,7 +295,7 @@ if [ "$BUILD_OPENSSL" = "yes" ]; then
   echo "  openssl:    3.6.0 $(file $ROOT_DIR/1.2.5/lib64/libssl.a)"
 fi
 if [ "$BUILD_SQLITE" = "yes" ]; then
-  echo "  sqlite:     master $(file $ROOT_DIR/1.2.5/lib/libsqlite3.a)"
+  echo "  sqlite:     3.51.0 $(file $ROOT_DIR/1.2.5/lib/libsqlite3.a)"
 fi
 echo ""
 echo "Features:"
