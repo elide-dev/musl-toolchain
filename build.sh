@@ -40,11 +40,14 @@ mkdir -p ./1.2.5/include/asm-generic
 cp -r /usr/include/linux/* ./1.2.5/include/linux/
 cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
 
-# if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-gnu
+# Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
+cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
+
+# if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-musl
 if [ "$ARCH_FLAVOR" = "amd64" ]; then
-  cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
+  LINUX_ARCH_DIR="x86_64-linux-musl"
 else
-  cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
+  LINUX_ARCH_DIR="aarch64-linux-musl"
 fi
 
 # Verify you got what you need
@@ -79,7 +82,7 @@ $MUSL_GCC --version;
 
 export CC=$ROOT_DIR/1.2.5/bin/musl-gcc
 
-export CFLAGS="-I$ROOT_DIR/1.2.5/include -I/usr/include/x86_64-linux-musl"
+export CFLAGS="-I$ROOT_DIR/1.2.5/include -I/usr/include/$LINUX_ARCH_DIR"
 export LDFLAGS="-L$ROOT_DIR/1.2.5/lib"
 
 export CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O2 -ffat-lto-objects -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2 $CFLAGS"
@@ -205,7 +208,6 @@ else
   # no-secure-memory \
 
   ./Configure \
-      linux-x86_64 \
       no-shared \
       no-tests \
       no-external-tests \
