@@ -20,5 +20,5 @@
 	shallow = true
 [submodule "sqlite"]
 	path = sqlite
-	url = git@github.com:sqlite/sqlite.git
+	url = git@github.com:elide-tools/sqlite.git
 	ignore = dirty
