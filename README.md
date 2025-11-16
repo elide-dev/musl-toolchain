@@ -60,4 +60,3 @@ numa nodes:     1
    elapsed:     0.000 s
    process: user: 0.000 s, system: 0.000 s, faults: 0, rss: 6.0 MiB, commit: 2.5 Mi
 ```
-
