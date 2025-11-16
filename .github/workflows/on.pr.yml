@@ -19,8 +19,10 @@ jobs:
         include:
           - arch: amd64
             target: x86-64-v4
+            tune: znver4
           - arch: arm64
-            target: armv8.1-a
+            target: armv8.4-a+crypto+sve
+            tune: neoverse-v1
     steps:
       - name: "Setup: Harden Runner"
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1

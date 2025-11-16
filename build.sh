@@ -198,16 +198,14 @@ else
   rm -fv buildlog.txt;
   export CFLAGS="$CFLAGS -fPIE -fPIC"
 
-  # no-shared \
-  # no-tests \
-  # no-external-tests \
-  # no-async \
-  # no-zlib \
-  # no-comp \
-  # no-asm \
-  # no-secure-memory \
+  if [ "$ARCH_FLAVOR" = "amd64" ]; then
+    OPENSSL_TARGET="linux-x86_64"
+  else
+    OPENSSL_TARGET="linux-aarch64"
+  fi
 
   ./Configure \
+      "$OPENSSL_TARGET" \
       no-shared \
       no-tests \
       no-external-tests \
@@ -261,7 +259,14 @@ echo "Verifying..."
 file $ROOT_DIR/1.2.5/bin/musl-gcc || exit 2
 file $ROOT_DIR/1.2.5/lib/libc.a || exit 2
 file $ROOT_DIR/1.2.5/lib/libz.a || exit 3
-file $ROOT_DIR/1.2.5/lib64/libssl.a || exit 4
+
+if [ "$ARCH_FLAVOR" = "amd64" ]; then
+  OPENSSL_LIB_DIR="lib64"
+else
+  OPENSSL_LIB_DIR="lib"
+fi
+
+file $ROOT_DIR/1.2.5/$OPENSSL_LIB_DIR/libssl.a || exit 4
 
 # Check that AVX-512 instructions are being used
 # objdump -d $ROOT_DIR/1.2.5/lib/libcrypt.a | grep -i "vpadd\|vpxor\|vaes" || exit 5
