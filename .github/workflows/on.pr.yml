@@ -34,4 +34,4 @@ jobs:
       - name: "Setup: Sccache"
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
       - name: "Build: Toolchain"
-        run: C_TARGET_ARCH=${{ matrix.target }} C_TARGET_TUNE=generic ./build.sh
+        run: C_TARGET_ARCH=${{ matrix.target }} ARCH_FLAVOR=${{ matrix.arch }} C_TARGET_TUNE=generic ./build.sh

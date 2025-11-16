@@ -16,6 +16,7 @@ MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
 USE_SCCACHE=${USE_SCCACHE:-yes}
 MAKE_SYMLINK=${MAKE_SYMLINK:-no}
 JOBS=`nproc`
+ARCH_FLAVOR=${ARCH_FLAVOR:-amd64}
 C_TARGET_ARCH=${C_TARGET_ARCH:-x86-64-v4}
 C_TARGET_TUNE=${C_TARGET_TUNE:-znver4}
 ROOT_DIR=$PWD
@@ -37,8 +38,14 @@ mkdir -p ./1.2.5/include/asm-generic
 
 # Copy kernel headers (adjust paths for Ubuntu's multiarch layout)
 cp -r /usr/include/linux/* ./1.2.5/include/linux/
-cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
 cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
+
+# if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-gnu
+if [ "$ARCH_FLAVOR" = "amd64" ]; then
+  cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
+else
+  cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
+fi
 
 # Verify you got what you need
 ls ./1.2.5/include/linux/mman.h
