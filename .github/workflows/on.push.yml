@@ -16,6 +16,7 @@ jobs:
     name: "Toolchain (${{ matrix.arch }})"
     runs-on: linux-${{ matrix.arch }}-cipool
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
