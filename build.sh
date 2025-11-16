@@ -42,10 +42,12 @@ cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
 
 # if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-musl
 if [ "$ARCH_FLAVOR" = "amd64" ]; then
+  MUSL_TARGET="x86_64-linux-musl"
   LINUX_ARCH_DIR="x86_64-linux-musl"
   # Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
   cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
 else
+  MUSL_TARGET="aarch64-linux-musl"
   LINUX_ARCH_DIR="aarch64-linux-musl"
   cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
 fi
@@ -60,6 +62,8 @@ echo "------- Building musl (phase 1)...";
 pushd musl;
 
 rm -fr mimalloc;
+make distclean || true
+rm -f config.mak
 
 make clean && \
   ./configure \
@@ -120,6 +124,8 @@ pushd musl;
 
 mkdir -p mimalloc/objs;
 rm -fv buildlog.txt mimalloc/objs/*;
+rm -f config.mak
+make distclean || true
 
 if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
   cp -fv ../mimalloc/out/release/mimalloc*.o ./mimalloc/objs/;
@@ -127,13 +133,9 @@ else
   echo "Not using mimalloc in musl build.";
 fi
 
-# patch for mimalloc
-# if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
-#   git apply ./patches/patch-3-elide-1.patch
-# fi
-
 make clean && \
   ./configure \
+    --target=$MUSL_TARGET \
     --prefix=$ROOT_DIR/1.2.5 \
     --enable-optimize=internal,malloc,string \
   && make -j${JOBS} \
@@ -146,10 +148,6 @@ make clean && \
 
 make install;
 
-# if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
-#   # un-patch
-#   git checkout .;
-# fi
 popd;
 
 ## Mount musl sysroot
@@ -267,12 +265,6 @@ else
 fi
 
 file $ROOT_DIR/1.2.5/$OPENSSL_LIB_DIR/libssl.a || exit 4
-
-# Check that AVX-512 instructions are being used
-# objdump -d $ROOT_DIR/1.2.5/lib/libcrypt.a | grep -i "vpadd\|vpxor\|vaes" || exit 5
-
-# Verify stack protection
-# readelf -s $ROOT_DIR/1.2.5/lib/libcrypt.a | grep stack_chk || exit 6
 
 echo "Verification complete."
 
