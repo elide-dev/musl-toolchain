@@ -35,9 +35,19 @@ jobs:
         with:
           submodules: false
           fetch-depth: 1
+      - name: "Setup: Git Variables"
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: "Setup: Submodules"
         run: rm -fr sqlite && git submodule update --init --depth=1 && git submodule update --init --recursive --depth=1 sqlite
       - name: "Setup: Sccache"
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
       - name: "Build: Toolchain"
         run: C_TARGET_ARCH=${{ matrix.target }} ARCH_FLAVOR=${{ matrix.arch }} C_TARGET_TUNE=generic ./build.sh
+      - name: "Artifact: Toolchain"
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}
+          path: 1.2.5/
+          compression-level: 1
+          overwrite: true
