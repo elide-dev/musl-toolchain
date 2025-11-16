@@ -13,7 +13,7 @@ env:
 jobs:
   build:
     name: "Toolchain (${{ matrix.arch }})"
-    runs-on: linux-${{ matrix.arch }}-cipool
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
@@ -21,9 +21,11 @@ jobs:
           - arch: amd64
             target: x86-64-v4
             tune: znver4
+            runner: ubuntu-latest
           - arch: arm64
             target: armv8.4-a+crypto+sve
             tune: neoverse-v1
+            runner: ubuntu-latest-arm64
     steps:
       - name: "Setup: Harden Runner"
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
