@@ -1,0 +1,12 @@
+[submodule "musl"]
+	path = musl
+	url = git@github.com:elide-tools/musl.git
+[submodule "mimalloc"]
+	path = mimalloc
+	url = git@github.com:microsoft/mimalloc.git
+[submodule "openssl"]
+	path = openssl
+	url = git@github.com:openssl/openssl.git
+[submodule "zlib"]
+	path = zlib
+	url = git@github.com:cloudflare/zlib.git
