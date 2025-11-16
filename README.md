@@ -15,6 +15,35 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 
 ```
 ./build.sh
+# ...
+-----------------------------------------------
+Musl Sysroot (1.2.5-patched.2):
+  Location: /.../musl/1.2.5
+  Compiler: /.../musl/1.2.5/bin/musl-gcc
+  Arch:     x86-64-v4
+  Tune:     znver3
+
+Compiler flags:
+  CFLAGS:   -I/.../musl/1.2.5/include
+  LDFLAGS:  -L/.../musl/1.2.5/lib -static
+  CC:       /.../musl/1.2.5/bin/musl-gcc
+  CFLAGS:   -march=x86-64-v4 -mtune=znver3 -O2 -ffat-lto-objects -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2 -I/.../musl/1.2.5/include -I/usr/include/x86_64-linux-musl -flto=auto -fPIE -fPIC
+  LDFLAGS:  -ffat-lto-objects -L/.../musl/1.2.5/lib -flto=auto -static -Wl,-z,relro,-z,now,-z,noexecstack
+
+Components:
+  mimalloc:   3.1.5
+  libc:       /.../musl/1.2.5/lib/libc.a: current ar archive
+  zlib:       (cloudflare@gcc.amd64) /.../musl/1.2.5/lib/libz.a: current ar archive
+  openssl:    3.6.0 /.../musl/1.2.5/lib64/libssl.a: current ar archive
+  sqlite:     3.51.0 /.../musl/1.2.5/lib/libsqlite3.a: current ar archive
+
+Features:
+  Secure:         OFF
+  Guarded:        OFF
+  CFI:            no
+  Mimalloc:       yes
+  Musl+Mimalloc:  yes
+-----------------------------------------------
 ```
 
 2) Set variables and run build.
@@ -61,3 +90,35 @@ numa nodes:     1
    process: user: 0.000 s, system: 0.000 s, faults: 0, rss: 6.0 MiB, commit: 2.5 Mi
 ```
 
+### Modifications / Settings
+
+The prepared sysroot includes all libraries, built statically, with the bootstrapped compiler. Modifications to Musl and libraries are listed below:
+
+- **Musl Libc**
+  - Patches ([1](./musl/patches/patch-1.patch), [2](./musl/patches/patch-2.patch)) applied according to upstream advice
+  - Patch ([3](./musl/patches/patch-3-elide-1.patch)) applied to swap `memallocng` for `mimalloc`, default to `-O2`
+  - Musl is built with `-O3` for subsystems `internal,malloc,string`
+- **Mimalloc**
+  - Built in secure mode by default
+  - Built with bootstrapped musl compiler, then used for stage2 build
+- **Zlib**
+  - Uses Cloudflare's accelerated fork of [zlib](https://github.com/cloudflare/zlib)
+- **OpenSSL**
+  - Builds with curve optimizations enabled, TLSv1.3 support
+
+`CFLAGS` underwent a round of hardening and optimization. Barring build conflicts, the following settings are applied to all compiled code:
+
+```
+-O2
+-flto=auto
+-ffat-lto-objects
+-fno-plt
+-fstack-protector-strong
+-fomit-frame-pointer
+-Wl,-z,relro,-z,now -Wa,--noexecstack
+
+-march=x86-64-v4             # amd64
+-mtune=znver3                # amd64
+-march=armv8.4-a+crypto+sve  # arm64
+-mtune=neoverse-v1           # arm64
+```

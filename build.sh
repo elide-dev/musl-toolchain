@@ -5,19 +5,20 @@
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
-# - SQLite: master branch as of Nov 2025
+# - SQLite: 3.51.0
 
 set -e -x
 
-SECURE=${SECURE:-ON}
-GUARDED=${GUARDED:-ON}
-CFI=${CFI:-yes}
+SECURE=${SECURE:-OFF}
+GUARDED=${GUARDED:-OFF}
+CFI=${CFI:-no}
 MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
 USE_SCCACHE=${USE_SCCACHE:-yes}
 MAKE_SYMLINK=${MAKE_SYMLINK:-no}
 JOBS=`nproc`
+ARCH_FLAVOR=${ARCH_FLAVOR:-amd64}
 C_TARGET_ARCH=${C_TARGET_ARCH:-x86-64-v4}
-C_TARGET_TUNE=${C_TARGET_TUNE:-znver4}
+C_TARGET_TUNE=${C_TARGET_TUNE:-znver3}
 ROOT_DIR=$PWD
 
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
@@ -37,8 +38,19 @@ mkdir -p ./1.2.5/include/asm-generic
 
 # Copy kernel headers (adjust paths for Ubuntu's multiarch layout)
 cp -r /usr/include/linux/* ./1.2.5/include/linux/
-cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
 cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
+
+# if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-musl
+if [ "$ARCH_FLAVOR" = "amd64" ]; then
+  MUSL_TARGET="x86_64-linux-musl"
+  LINUX_ARCH_DIR="x86_64-linux-musl"
+  # Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
+  cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
+else
+  MUSL_TARGET="aarch64-linux-musl"
+  LINUX_ARCH_DIR="aarch64-linux-musl"
+  cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
+fi
 
 # Verify you got what you need
 ls ./1.2.5/include/linux/mman.h
@@ -50,6 +62,8 @@ echo "------- Building musl (phase 1)...";
 pushd musl;
 
 rm -fr mimalloc;
+make distclean || true
+rm -f config.mak
 
 make clean && \
   ./configure \
@@ -63,6 +77,12 @@ make clean && \
     ADD_CFI=$CFI \
     | tee buildlog.txt;
 
+# Debug: Check detected architecture
+echo "=== Musl Configuration ==="
+grep "^ARCH" config.mak
+echo "Expected: ARCH = $(uname -m)"
+echo "=========================="
+
 make install;
 popd;
 
@@ -72,7 +92,7 @@ $MUSL_GCC --version;
 
 export CC=$ROOT_DIR/1.2.5/bin/musl-gcc
 
-export CFLAGS="-I$ROOT_DIR/1.2.5/include -I/usr/include/x86_64-linux-musl"
+export CFLAGS="-I$ROOT_DIR/1.2.5/include -I/usr/include/$LINUX_ARCH_DIR"
 export LDFLAGS="-L$ROOT_DIR/1.2.5/lib"
 
 export CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O2 -ffat-lto-objects -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2 $CFLAGS"
@@ -110,17 +130,14 @@ pushd musl;
 
 mkdir -p mimalloc/objs;
 rm -fv buildlog.txt mimalloc/objs/*;
+rm -f config.mak
+make distclean || true
 
 if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
   cp -fv ../mimalloc/out/release/mimalloc*.o ./mimalloc/objs/;
 else
   echo "Not using mimalloc in musl build.";
 fi
-
-# patch for mimalloc
-# if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
-#   git apply ./patches/patch-3-elide-1.patch
-# fi
 
 make clean && \
   ./configure \
@@ -136,10 +153,6 @@ make clean && \
 
 make install;
 
-# if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
-#   # un-patch
-#   git checkout .;
-# fi
 popd;
 
 ## Mount musl sysroot
@@ -188,17 +201,14 @@ else
   rm -fv buildlog.txt;
   export CFLAGS="$CFLAGS -fPIE -fPIC"
 
-  # no-shared \
-  # no-tests \
-  # no-external-tests \
-  # no-async \
-  # no-zlib \
-  # no-comp \
-  # no-asm \
-  # no-secure-memory \
+  if [ "$ARCH_FLAVOR" = "amd64" ]; then
+    OPENSSL_TARGET="linux-x86_64"
+  else
+    OPENSSL_TARGET="linux-aarch64"
+  fi
 
   ./Configure \
-      linux-x86_64 \
+      "$OPENSSL_TARGET" \
       no-shared \
       no-tests \
       no-external-tests \
@@ -252,13 +262,14 @@ echo "Verifying..."
 file $ROOT_DIR/1.2.5/bin/musl-gcc || exit 2
 file $ROOT_DIR/1.2.5/lib/libc.a || exit 2
 file $ROOT_DIR/1.2.5/lib/libz.a || exit 3
-file $ROOT_DIR/1.2.5/lib64/libssl.a || exit 4
 
-# Check that AVX-512 instructions are being used
-# objdump -d $ROOT_DIR/1.2.5/lib/libcrypt.a | grep -i "vpadd\|vpxor\|vaes" || exit 5
+if [ "$ARCH_FLAVOR" = "amd64" ]; then
+  OPENSSL_LIB_DIR="lib64"
+else
+  OPENSSL_LIB_DIR="lib"
+fi
 
-# Verify stack protection
-# readelf -s $ROOT_DIR/1.2.5/lib/libcrypt.a | grep stack_chk || exit 6
+file $ROOT_DIR/1.2.5/$OPENSSL_LIB_DIR/libssl.a || exit 4
 
 echo "Verification complete."
 
@@ -267,7 +278,8 @@ echo "-----------------------------------------------"
 echo "Musl Sysroot (1.2.5-patched.2):"
 echo "  Location: $ROOT_DIR/1.2.5"
 echo "  Compiler: $MUSL_GCC"
-echo "  Arch:     $TARGET_ARCH"
+echo "  Arch:     $C_TARGET_ARCH"
+echo "  Tune:     $C_TARGET_TUNE"
 echo ""
 echo "Compiler flags:"
 echo "  CFLAGS:   -I$ROOT_DIR/1.2.5/include"
@@ -286,7 +298,7 @@ if [ "$BUILD_OPENSSL" = "yes" ]; then
   echo "  openssl:    3.6.0 $(file $ROOT_DIR/1.2.5/lib64/libssl.a)"
 fi
 if [ "$BUILD_SQLITE" = "yes" ]; then
-  echo "  sqlite:     master $(file $ROOT_DIR/1.2.5/lib/libsqlite3.a)"
+  echo "  sqlite:     3.51.0 $(file $ROOT_DIR/1.2.5/lib/libsqlite3.a)"
 fi
 echo ""
 echo "Features:"
