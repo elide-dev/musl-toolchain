@@ -36,6 +36,10 @@ mkdir -p ./1.2.5/include/linux
 mkdir -p ./1.2.5/include/asm
 mkdir -p ./1.2.5/include/asm-generic
 
+pushd 1.2.5/bin;
+ln -s musl-gcc x86_64-linux-musl-gcc;
+popd;
+
 # Copy kernel headers (adjust paths for Ubuntu's multiarch layout)
 cp -r /usr/include/linux/* ./1.2.5/include/linux/
 cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
