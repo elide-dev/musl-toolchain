@@ -60,9 +60,6 @@ else
   MUSL_TARGET="aarch64-linux-musl"
   LINUX_ARCH_DIR="aarch64-linux-musl"
   SECURITY_CFLAGS="$SECURITY_CFLAGS -mbranch-protection=standard"
-  if [ "$CFI" = "yes" ]; then
-    SECURITY_CFLAGS="$SECURITY_CFLAGS -fcf-protection=full $([ "$MPK" = "yes" ] && echo "-mpku")"
-  fi
   cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
 fi
 
