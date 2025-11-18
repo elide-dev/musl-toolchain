@@ -44,6 +44,7 @@ SECURITY_CFLAGS=""
 
 # if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-musl
 if [ "$ARCH_FLAVOR" = "amd64" ]; then
+  ARCH_FLAVOR="x86_64";
   MUSL_TARGET="x86_64-linux-musl"
   LINUX_ARCH_DIR="x86_64-linux-musl"
   SECURITY_CFLAGS="$SECURITY_CFLAGS"
@@ -55,14 +56,19 @@ if [ "$ARCH_FLAVOR" = "amd64" ]; then
   pushd 1.2.5/bin;
   ln -s musl-gcc x86_64-linux-musl-gcc;
   popd;
-else
-  MUSL_TARGET="aarch64-linux-musl"
-  LINUX_ARCH_DIR="aarch64-linux-musl"
+else if [ "$ARCH_FLAVOR" = "arm64" ]; then
+  ARCH_FLAVOR="aarch64";
+  MUSL_TARGET="$ARCH_FLAVOR-linux-musl"
+  LINUX_ARCH_DIR="$ARCH_FLAVOR-linux-musl"
   SECURITY_CFLAGS="$SECURITY_CFLAGS -mbranch-protection=standard"
-  cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
+  cp -r "/usr/include/$ARCH_FLAVOR-linux-gnu/asm/*" ./1.2.5/include/asm/
   pushd 1.2.5/bin;
-  ln -s musl-gcc aarch64-linux-musl-gcc;
+  ln -s musl-gcc "$ARCH_FLAVOR-linux-musl-gcc";
   popd;
+else
+  echo "Unsupported ARCH_FLAVOR: $ARCH_FLAVOR";
+  exit 1;
+fi
 fi
 
 # Verify you got what you need
@@ -112,6 +118,7 @@ pushd musl-cross-make;
 make clean || echo "Nothing to clean.";
 
 make -j${JOBS} \
+  MUSL_ARCH="$ARCH_FLAVOR" \
   OUTPUT=$ROOT_DIR/1.2.5 \
   TARGET=$MUSL_TARGET \
   TUNE=$C_TARGET_TUNE \
