@@ -87,7 +87,6 @@ rm -f config.mak
 
 make clean && \
   ./configure \
-    --target=$MUSL_TARGET \
     --prefix=$ROOT_DIR/1.2.5 \
     --with-malloc=mallocng \
     --enable-optimize=internal,malloc,string \
