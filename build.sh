@@ -62,7 +62,7 @@ else if [ "$ARCH_FLAVOR" = "arm64" ]; then
   MUSL_TARGET="$ARCH_FLAVOR-linux-musl"
   LINUX_ARCH_DIR="$ARCH_FLAVOR-linux-musl"
   SECURITY_CFLAGS="$SECURITY_CFLAGS -mbranch-protection=standard"
-  cp -r "/usr/include/$ARCH_FLAVOR-linux-gnu/asm/*" ./1.2.5/include/asm/
+  cp -r /usr/include/$ARCH_FLAVOR-linux-gnu/asm/* ./1.2.5/include/asm/
   pushd 1.2.5/bin;
   ln -s musl-gcc "$ARCH_FLAVOR-linux-musl-gcc";
   popd;
