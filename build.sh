@@ -9,6 +9,7 @@
 
 set -e -x
 
+HARDEN=${HARDEN:-yes}
 SECURE=${SECURE:-ON}
 GUARDED=${GUARDED:-ON}
 CFI=${CFI:-yes}
@@ -124,6 +125,7 @@ make -j${JOBS} \
   TUNE=$C_TARGET_TUNE \
   TARGET_MARCH=$C_TARGET_ARCH \
   SECURITY_CFLAGS="$SECURITY_CFLAGS" \
+  HARDEN=$HARDEN \
   CFI=$CFI \
   MPK=$MPK \
   install | tee buildlog.txt;
@@ -344,6 +346,7 @@ if [ "$BUILD_SQLITE" = "yes" ]; then
 fi
 echo ""
 echo "Features:"
+echo "  Hardened:       $HARDEN"
 echo "  Secure:         $SECURE"
 echo "  Guarded:        $GUARDED"
 echo "  CFI:            $CFI"

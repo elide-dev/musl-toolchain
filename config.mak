@@ -1,18 +1,15 @@
 #
-# config.mak.dist - toolchain musl-cross-make configuration
+# config.mak - toolchain musl-cross-make configuration
 #
 
+## Settings.
 MUSL_ARCH ?= x86_64
 TARGET ?= $(MUSL_ARCH)-linux-musl
 TUNE ?= generic
+HARDEN ?= yes
+FORTIFY_LEVEL ?= 3
 
-ifeq ($(MUSL_ARCH),x86_64)
-TARGET_MARCH ?= x86-64-v4
-endif
-ifeq ($(MUSL_ARCH),arm64)
-TARGET_MARCH ?= armv8.4-a+crypto+sve
-endif
-
+## Versions.
 BINUTILS_VER = 2.44
 GCC_VER = 14.2.0
 MUSL_VER = 1.2.5
@@ -22,9 +19,33 @@ MPFR_VER = 4.2.2
 ISL_VER = 0.27
 LINUX_VER = 6.15.7
 
-COMMON_CONFIG += CFLAGS="-g0 -O2 -ffat-lto-objects -march=$(TARGET_MARCH) -mtune=$(TUNE) -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2"
-COMMON_CONFIG += CXXFLAGS="-g0 -O2 -ffat-lto-objects -march=$(TARGET_MARCH) -mtune=$(TUNE) -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2"
-COMMON_CONFIG += LDFLAGS="-s -ffat-lto-objects -Wl,-z,relro,-z,now,-z,noexecstack"
+BASE_SECURITY_FLAGS_LD ?=-Wl,-z,relro,-z,now -Wa,--noexecstack
+BASE_SECURITY_FLAGS ?=-mpku -fstack-protector-strong -D_FORTIFY_SOURCE=$(FORTIFY_LEVEL) $(BASE_SECURITY_FLAGS_LD)
+
+ifeq ($(MUSL_ARCH),x86_64)
+TARGET_MARCH ?= x86-64-v4
+ifeq ($(HARDEN),yes)
+SECURITY_FLAGS ?=-fcf-protection=full $(BASE_SECURITY_FLAGS)
+SECURITY_FLAGS_LD ?=$(BASE_SECURITY_FLAGS_LD)
+else
+SECURITY_FLAGS ?=
+SECURITY_FLAGS_LD ?=
+endif
+endif
+ifeq ($(MUSL_ARCH),arm64)
+TARGET_MARCH ?= armv8.4-a+crypto+sve
+ifeq ($(HARDEN),yes)
+SECURITY_FLAGS ?=-mbranch-protection=standard $(BASE_SECURITY_FLAGS)
+SECURITY_FLAGS_LD ?=$(BASE_SECURITY_FLAGS_LD)
+else
+SECURITY_FLAGS ?=
+SECURITY_FLAGS_LD ?=
+endif
+endif
+
+COMMON_CONFIG += CFLAGS="-g0 -O2 -ffat-lto-objects -march=$(TARGET_MARCH) -mtune=$(TUNE) $(SECURITY_FLAGS)"
+COMMON_CONFIG += CXXFLAGS="-g0 -O2 -ffat-lto-objects -march=$(TARGET_MARCH) -mtune=$(TUNE) $(SECURITY_FLAGS)"
+COMMON_CONFIG += LDFLAGS="-s -ffat-lto-objects $(SECURITY_FLAGS_LD)"
 
 # COMMON_CONFIG += --disable-nls
 # GCC_CONFIG += --disable-libquadmath --disable-decimal-float
