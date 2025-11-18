@@ -37,10 +37,6 @@ mkdir -p ./1.2.5/include/linux
 mkdir -p ./1.2.5/include/asm
 mkdir -p ./1.2.5/include/asm-generic
 
-pushd 1.2.5/bin;
-ln -s musl-gcc x86_64-linux-musl-gcc;
-popd;
-
 # Copy kernel headers (adjust paths for Ubuntu's multiarch layout)
 cp -r /usr/include/linux/* ./1.2.5/include/linux/
 cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
@@ -56,11 +52,17 @@ if [ "$ARCH_FLAVOR" = "amd64" ]; then
   fi
   # Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
   cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
+  pushd 1.2.5/bin;
+  ln -s musl-gcc x86_64-linux-musl-gcc;
+  popd;
 else
   MUSL_TARGET="aarch64-linux-musl"
   LINUX_ARCH_DIR="aarch64-linux-musl"
   SECURITY_CFLAGS="$SECURITY_CFLAGS -mbranch-protection=standard"
   cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
+  pushd 1.2.5/bin;
+  ln -s musl-gcc aarch64-linux-musl-gcc;
+  popd;
 fi
 
 # Verify you got what you need
