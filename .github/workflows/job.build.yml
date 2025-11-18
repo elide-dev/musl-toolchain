@@ -40,7 +40,7 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: "Setup: Submodules"
-        run: rm -fr sqlite && git submodule update --init --depth=1 && git submodule update --init --recursive --depth=1 sqlite
+        run: git submodule update --init --depth=1 && git submodule update --init --recursive --depth=1 sqlite
       - name: "Setup: Sccache"
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
       - name: "Build: Toolchain"
