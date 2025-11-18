@@ -22,3 +22,6 @@
 	path = sqlite
 	url = https://github.com/elide-tools/sqlite.git
 	ignore = dirty
+[submodule "musl-cross-make"]
+	path = musl-cross-make
+	url = git@github.com:richfelker/musl-cross-make.git

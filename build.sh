@@ -9,9 +9,10 @@
 
 set -e -x
 
-SECURE=${SECURE:-OFF}
-GUARDED=${GUARDED:-OFF}
-CFI=${CFI:-no}
+SECURE=${SECURE:-ON}
+GUARDED=${GUARDED:-ON}
+CFI=${CFI:-yes}
+MPK=${MPK:-yes}
 MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
 USE_SCCACHE=${USE_SCCACHE:-yes}
 MAKE_SYMLINK=${MAKE_SYMLINK:-no}
@@ -43,16 +44,25 @@ popd;
 # Copy kernel headers (adjust paths for Ubuntu's multiarch layout)
 cp -r /usr/include/linux/* ./1.2.5/include/linux/
 cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
+SECURITY_CFLAGS=""
 
 # if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-musl
 if [ "$ARCH_FLAVOR" = "amd64" ]; then
   MUSL_TARGET="x86_64-linux-musl"
   LINUX_ARCH_DIR="x86_64-linux-musl"
+  SECURITY_CFLAGS="$SECURITY_CFLAGS"
+  if [ "$CFI" = "yes" ]; then
+    SECURITY_CFLAGS="$SECURITY_CFLAGS -fcf-protection=full $([ "$MPK" = "yes" ] && echo "-mpku")"
+  fi
   # Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
   cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
 else
   MUSL_TARGET="aarch64-linux-musl"
   LINUX_ARCH_DIR="aarch64-linux-musl"
+  SECURITY_CFLAGS="$SECURITY_CFLAGS -mbranch-protection=standard"
+  if [ "$CFI" = "yes" ]; then
+    SECURITY_CFLAGS="$SECURITY_CFLAGS -fcf-protection=full $([ "$MPK" = "yes" ] && echo "-mpku")"
+  fi
   cp -r /usr/include/aarch64-linux-gnu/asm/* ./1.2.5/include/asm/
 fi
 
@@ -75,9 +85,9 @@ make clean && \
     --with-malloc=mallocng \
     --enable-optimize=internal,malloc,string \
   && make -j${JOBS} \
-    CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects -fno-plt -fstack-protector-strong -fomit-frame-pointer -Wl,-z,relro,-z,now -Wa,--noexecstack" \
-    CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects" \
-    CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects" \
+    CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects -fno-plt -fstack-protector-strong -fomit-frame-pointer -Wl,-z,relro,-z,now -Wa,--noexecstack $SECURITY_CFLAGS" \
+    CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects $SECURITY_CFLAGS" \
+    CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects $SECURITY_CFLAGS" \
     ADD_CFI=$CFI \
     | tee buildlog.txt;
 
@@ -94,12 +104,34 @@ echo "Smoketesting compiler..."
 MUSL_GCC=$ROOT_DIR/1.2.5/bin/musl-gcc
 $MUSL_GCC --version;
 
+## Build musl (bootstrap compiler)
+echo "------- Building musl-cross-make...";
+
+cp -fv config.mak musl-cross-make/config.mak
+pushd musl-cross-make;
+
+make clean || echo "Nothing to clean.";
+
+make -j${JOBS} \
+  OUTPUT=$ROOT_DIR/1.2.5 \
+  TARGET=$MUSL_TARGET \
+  TUNE=$C_TARGET_TUNE \
+  TARGET_MARCH=$C_TARGET_ARCH \
+  SECURITY_CFLAGS="$SECURITY_CFLAGS" \
+  CFI=$CFI \
+  MPK=$MPK \
+  install | tee buildlog.txt;
+
+popd;
+
+####
+
 export CC=$ROOT_DIR/1.2.5/bin/musl-gcc
 
 export CFLAGS="-I$ROOT_DIR/1.2.5/include -I/usr/include/$LINUX_ARCH_DIR"
 export LDFLAGS="-L$ROOT_DIR/1.2.5/lib"
 
-export CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O2 -ffat-lto-objects -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2 $CFLAGS"
+export CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O2 -ffat-lto-objects -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2 $SECURITY_CFLAGS $CFLAGS"
 export LDFLAGS="-ffat-lto-objects $LDFLAGS"
 
 ## Build mimalloc
@@ -119,7 +151,7 @@ cmake \
     -DCMAKE_C_COMPILER_LAUNCHER=sccache \
     -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
     -DCMAKE_C_COMPILER=$CC \
-    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -fPIC -O3 -ffat-lto-objects" \
+    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -fPIC -O3 -ffat-lto-objects $SECURITY_CFLAGS" \
     -DCMAKE_INSTALL_PREFIX=$ROOT_DIR/1.2.5 \
     ../..;
 make -j${JOBS} | tee buildlog.txt;
@@ -148,9 +180,9 @@ make clean && \
     --prefix=$ROOT_DIR/1.2.5 \
     --enable-optimize=internal,malloc,string \
   && make -j${JOBS} \
-    CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects -fno-plt -fstack-protector-strong -fomit-frame-pointer -Wl,-z,relro,-z,now" \
-    CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects" \
-    CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects" \
+    CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects -fno-plt -fstack-protector-strong -fomit-frame-pointer -Wl,-z,relro,-z,now $SECURITY_CFLAGS" \
+    CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects $SECURITY_CFLAGS" \
+    CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects $SECURITY_CFLAGS" \
     USE_MIMALLOC=$MUSL_USE_MIMALLOC \
     ADD_CFI=$CFI \
     | tee buildlog.txt;
