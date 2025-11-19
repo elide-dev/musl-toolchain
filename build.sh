@@ -185,7 +185,6 @@ fi
 
 make clean && \
   ./configure \
-    --target=$MUSL_TARGET \
     --prefix=$ROOT_DIR/1.2.5 \
     --enable-optimize=internal,malloc,string \
   && make -j${JOBS} \
