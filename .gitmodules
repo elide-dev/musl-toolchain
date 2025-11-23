@@ -28,4 +28,9 @@
 	url = https://github.com/richfelker/musl-cross-make.git
 	shallow = true
 	ignore = dirty
+[submodule "capnp"]
+	path = capnp
+	url = https://github.com/capnproto/capnproto.git
+	ignore = dirty
+	shallow = true
 
