@@ -33,4 +33,9 @@
 	url = https://github.com/capnproto/capnproto.git
 	ignore = dirty
 	shallow = true
-
+[submodule "llvm"]
+	path = llvm
+	url = https://github.com/llvm/llvm-project.git
+	branch = b708aea0bc7127adf4ec643660699c8bcdde1273
+	shallow = true
+	ignore = dirty
