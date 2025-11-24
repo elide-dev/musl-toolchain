@@ -8,6 +8,29 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 - [`zlib`](https://github.com/cloudflare/zlib), cloudflare's optimized fork
 - [`openssl`](https://github.com/openssl/openssl), with optimizations turned on
 - [`sqlite`](https://github.com/sqlite/sqlite), latest version, properly built for musl, optimizations on
+- [`capnp`](https://capnproto.org/) (cap'n'proto), latest version, built against musl
+- [`llvm`](https://github.com/llvm/llvm-project), matching our rustc version, built against musl
+
+#### Toolchain
+
+The following versions are pinned/established by this toolchain:
+
+| **Software** | **Version**            | **Notes**                                              |
+| ------------ | ---------------------- | ------------------------------------------------------ |
+| GCC          | `15.2.0`               | Upgraded in line with Ubuntu build machines (`25.10`)  |
+| Binutils     | `2.44`                 | GCC dependencies |
+| GMP          | `6.3.0`                | GCC dependencies |
+| MPC          | `1.3.1`                | GCC dependencies |
+| MPFR         | `4.2.2`                | GCC dependencies |
+| ISL          | `0.27`                 | GCC dependencies |
+| Linux        | `6.15.7`               | Kernel headers only |
+| Clang/LLVM   | `21.1.2`               | Matches pinned `rustc` toolchain version               |
+| Musl Libc    | `1.2.5+p3`             | Latest + two upstream patches + Elide's singular patch |
+| Mimalloc     | `3.1.5`                | |
+| OpenSSL      | `3.6.0`                | |
+| Zlib         | `cloudflare@gcc.amd64` | Cloudflare's accelerated fork of `zlib` |
+| SQLite       | `3.51.0`               | |
+| Cap'n'Proto  | `master` (`v1`)        | "v1 with bugfixes" (`v2` is unsupported in Java)       |
 
 ### Usage
 
@@ -46,7 +69,7 @@ Features:
 -----------------------------------------------
 ```
 
-2) Set variables and run build.
+2) In another native build: Set variables and run.
 
 ```
 export CC=$PWD/latest/x86_64-linux-musl-gcc
@@ -98,6 +121,8 @@ The prepared sysroot includes all libraries, built statically, with the bootstra
   - Patches ([1](./musl/patches/patch-1.patch), [2](./musl/patches/patch-2.patch)) applied according to upstream advice
   - Patch ([3](./musl/patches/patch-3-elide-1.patch)) applied to swap `memallocng` for `mimalloc`, default to `-O2`
   - Musl is built with `-O3` for subsystems `internal,malloc,string`
+- **Musl Cross-Make**
+  - Added GCC `15.2.0`
 - **Mimalloc**
   - Built in secure mode by default
   - Built with bootstrapped musl compiler, then used for stage2 build
@@ -117,8 +142,11 @@ The prepared sysroot includes all libraries, built statically, with the bootstra
 -fomit-frame-pointer
 -Wl,-z,relro,-z,now -Wa,--noexecstack
 
--march=x86-64-v4             # amd64
--mtune=znver3                # amd64
--march=armv8.4-a+crypto+sve  # arm64
--mtune=neoverse-v1           # arm64
+# on amd64
+-march=x86-64-v4
+-mtune=znver3
+
+# on arm64
+-march=armv8.4-a+crypto+sve
+-mtune=neoverse-v1
 ```
