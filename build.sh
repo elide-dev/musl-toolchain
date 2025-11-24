@@ -10,11 +10,12 @@
 set -e -x
 
 HARDEN=${HARDEN:-yes}
-SECURE=${SECURE:-ON}
-GUARDED=${GUARDED:-ON}
-CFI=${CFI:-yes}
-MPK=${MPK:-yes}
+SECURE=${SECURE:-OFF}
+GUARDED=${GUARDED:-OFF}
+CFI=${CFI:-no}
+MPK=${MPK:-no}
 MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
+USE_MUSL_CROSSMAKE=${USE_MUSL_CROSSMAKE:-yes}
 USE_SCCACHE=${USE_SCCACHE:-yes}
 MAKE_SYMLINK=${MAKE_SYMLINK:-no}
 JOBS=`nproc`
@@ -26,6 +27,7 @@ ROOT_DIR=$PWD
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_SQLITE=${BUILD_SQLITE:-yes}
+BUILD_CAPNP=${BUILD_CAPNP:-no}
 
 unset CC
 unset CFLAGS
@@ -110,29 +112,30 @@ echo "Smoketesting compiler..."
 MUSL_GCC=$ROOT_DIR/1.2.5/bin/musl-gcc
 $MUSL_GCC --version;
 
-## Build musl (bootstrap compiler)
-echo "------- Building musl-cross-make...";
+if [ "$USE_MUSL_CROSSMAKE" = "yes" ]; then
+  ## Build musl (bootstrap compiler)
+  echo "------- Building musl-cross-make...";
 
-cp -fv config.mak musl-cross-make/config.mak
-pushd musl-cross-make;
+  cp -fv config.mak musl-cross-make/config.mak
+  pushd musl-cross-make;
 
-make clean || echo "Nothing to clean.";
+  make clean || echo "Nothing to clean.";
 
-make -j${JOBS} \
-  MUSL_ARCH="$ARCH_FLAVOR" \
-  OUTPUT=$ROOT_DIR/1.2.5 \
-  TARGET=$MUSL_TARGET \
-  TUNE=$C_TARGET_TUNE \
-  TARGET_MARCH=$C_TARGET_ARCH \
-  SECURITY_CFLAGS="$SECURITY_CFLAGS" \
-  HARDEN=$HARDEN \
-  CFI=$CFI \
-  MPK=$MPK \
-  install | tee buildlog.txt;
+  make -j${JOBS} \
+    MUSL_ARCH="$ARCH_FLAVOR" \
+    OUTPUT=$ROOT_DIR/1.2.5 \
+    TARGET=$MUSL_TARGET \
+    TUNE=$C_TARGET_TUNE \
+    TARGET_MARCH=$C_TARGET_ARCH \
+    SECURITY_CFLAGS="$SECURITY_CFLAGS" \
+    HARDEN=$HARDEN \
+    CFI=$CFI \
+    MPK=$MPK \
+    install | tee buildlog.txt;
 
-popd;
-
-####
+  popd;
+  ####
+fi
 
 export CC=$ROOT_DIR/1.2.5/bin/musl-gcc
 
@@ -299,6 +302,25 @@ else
   popd;
 fi
 
+### Build capnp
+
+if [ "$BUILD_CAPNP" != "yes" ]; then
+  echo "Skipping capnp build.";
+else
+  echo "------- Building capnp...";
+
+  cd capnp/c++;
+  autoreconf -i;
+  ./configure \
+    --prefix=$ROOT_DIR/1.2.5 \
+    --with-zlib \
+    --with-openssl \
+    --with-sysroot=$ROOT_DIR/1.2.5;
+  make -j${JOBS} check
+  make install
+  cd -;
+fi
+
 set +x -e
 sleep 1
 
@@ -344,6 +366,9 @@ fi
 if [ "$BUILD_SQLITE" = "yes" ]; then
   echo "  sqlite:     3.51.0 $(file $ROOT_DIR/1.2.5/lib/libsqlite3.a)"
 fi
+if [ "$BUILD_CAPNP" = "yes" ]; then
+  echo "  capnp:      v1.3.0 $(file $ROOT_DIR/1.2.5/lib/libcapnp.a)"
+fi
 echo ""
 echo "Features:"
 echo "  Hardened:       $HARDEN"
@@ -352,6 +377,7 @@ echo "  Guarded:        $GUARDED"
 echo "  CFI:            $CFI"
 echo "  Mimalloc:       yes"
 echo "  Musl+Mimalloc:  $MUSL_USE_MIMALLOC"
+echo "  Musl-CrossMake: $USE_MUSL_CROSSMAKE"
 echo "-----------------------------------------------"
 
 if [ "$MAKE_SYMLINK" != "yes" ]; then
