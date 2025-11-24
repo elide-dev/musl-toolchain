@@ -25,7 +25,7 @@
 	shallow = true
 [submodule "musl-cross-make"]
 	path = musl-cross-make
-	url = https://github.com/richfelker/musl-cross-make.git
+	url = https://github.com/elide-tools/musl-cross-make.git
 	shallow = true
 	ignore = dirty
 [submodule "capnp"]
