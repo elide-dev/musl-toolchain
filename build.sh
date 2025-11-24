@@ -6,6 +6,7 @@
 # - OpenSSL: 3.6.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
 # - SQLite: 3.51.0
+# - LLVM: 21.1.2
 
 set -e -x
 
@@ -14,6 +15,7 @@ SECURE=${SECURE:-OFF}
 GUARDED=${GUARDED:-OFF}
 CFI=${CFI:-no}
 MPK=${MPK:-no}
+CLEAN_BEFORE_BUILD=${CLEAN_BEFORE_BUILD:-no}
 MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
 USE_MUSL_CROSSMAKE=${USE_MUSL_CROSSMAKE:-yes}
 USE_SCCACHE=${USE_SCCACHE:-yes}
@@ -24,6 +26,9 @@ C_TARGET_ARCH=${C_TARGET_ARCH:-x86-64-v4}
 C_TARGET_TUNE=${C_TARGET_TUNE:-znver3}
 ROOT_DIR=$PWD
 
+MUSL_VERSION=1.2.5
+SYSROOT_PREFIX="$ROOT_DIR/$MUSL_VERSION"
+
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_SQLITE=${BUILD_SQLITE:-yes}
@@ -33,16 +38,25 @@ unset CC
 unset CFLAGS
 unset LDFLAGS
 
-rm -fr 1.2.5
-mkdir -p 1.2.5/lib 1.2.5/include 1.2.5/bin
+# if musl version is empty, fail
+if [ -z "$MUSL_VERSION" ]; then
+  echo "MUSL_VERSION is not set. Exiting.";
+  exit 1;
+fi
+if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+  echo "Cleaning previous build at $MUSL_VERSION ..."
+  rm -fr "$MUSL_VERSION"
+fi
 
-mkdir -p ./1.2.5/include/linux
-mkdir -p ./1.2.5/include/asm
-mkdir -p ./1.2.5/include/asm-generic
+mkdir -p "$MUSL_VERSION/lib" "$MUSL_VERSION/include" "$MUSL_VERSION/bin"
+
+mkdir -p ./"$MUSL_VERSION/include/linux"
+mkdir -p ./"$MUSL_VERSION/include/asm"
+mkdir -p ./"$MUSL_VERSION/include/asm-generic"
 
 # Copy kernel headers (adjust paths for Ubuntu's multiarch layout)
-cp -r /usr/include/linux/* ./1.2.5/include/linux/
-cp -r /usr/include/asm-generic/* ./1.2.5/include/asm-generic/
+cp -r /usr/include/linux/* "./$MUSL_VERSION/include/linux/"
+cp -r /usr/include/asm-generic/* "./$MUSL_VERSION/include/asm-generic/"
 SECURITY_CFLAGS=""
 
 # if the ARCH_FLAVOR is amd64, we need to copy from x86_64-linux-musl
@@ -55,8 +69,8 @@ if [ "$ARCH_FLAVOR" = "amd64" ]; then
     SECURITY_CFLAGS="$SECURITY_CFLAGS -fcf-protection=full $([ "$MPK" = "yes" ] && echo "-mpku")"
   fi
   # Specifically copy asm headers from x86_64-linux-gnu, since musl does not have them
-  cp -r /usr/include/x86_64-linux-gnu/asm/* ./1.2.5/include/asm/
-  pushd 1.2.5/bin;
+  cp -r /usr/include/x86_64-linux-gnu/asm/* "./$MUSL_VERSION/include/asm/"
+  pushd "$MUSL_VERSION/bin";
   ln -s musl-gcc x86_64-linux-musl-gcc;
   popd;
 else if [ "$ARCH_FLAVOR" = "arm64" ]; then
@@ -64,8 +78,8 @@ else if [ "$ARCH_FLAVOR" = "arm64" ]; then
   MUSL_TARGET="$ARCH_FLAVOR-linux-musl"
   LINUX_ARCH_DIR="$ARCH_FLAVOR-linux-musl"
   SECURITY_CFLAGS="$SECURITY_CFLAGS -mbranch-protection=standard"
-  cp -r /usr/include/$ARCH_FLAVOR-linux-gnu/asm/* ./1.2.5/include/asm/
-  pushd 1.2.5/bin;
+  cp -r /usr/include/$ARCH_FLAVOR-linux-gnu/asm/* "./$MUSL_VERSION/include/asm/"
+  pushd "$MUSL_VERSION/bin";
   ln -s musl-gcc "$ARCH_FLAVOR-linux-musl-gcc";
   popd;
 else
@@ -75,9 +89,9 @@ fi
 fi
 
 # Verify you got what you need
-ls ./1.2.5/include/linux/mman.h
+ls "./$MUSL_VERSION/include/linux/mman.h"
 
-sudo chown -R $(whoami) ./1.2.5
+sudo chown -R $(whoami) "./$MUSL_VERSION"
 
 ## Build musl (bootstrap compiler)
 echo "------- Building musl (phase 1)...";
@@ -89,7 +103,7 @@ rm -f config.mak
 
 make clean && \
   ./configure \
-    --prefix=$ROOT_DIR/1.2.5 \
+    --prefix="$SYSROOT_PREFIX" \
     --with-malloc=mallocng \
     --enable-optimize=internal,malloc,string \
   && make -j${JOBS} \
@@ -109,7 +123,7 @@ make install;
 popd;
 
 echo "Smoketesting compiler..."
-MUSL_GCC=$ROOT_DIR/1.2.5/bin/musl-gcc
+MUSL_GCC="$SYSROOT_PREFIX/bin/musl-gcc"
 $MUSL_GCC --version;
 
 if [ "$USE_MUSL_CROSSMAKE" = "yes" ]; then
@@ -123,7 +137,7 @@ if [ "$USE_MUSL_CROSSMAKE" = "yes" ]; then
 
   make -j${JOBS} \
     MUSL_ARCH="$ARCH_FLAVOR" \
-    OUTPUT=$ROOT_DIR/1.2.5 \
+    OUTPUT="$SYSROOT_PREFIX" \
     TARGET=$MUSL_TARGET \
     TUNE=$C_TARGET_TUNE \
     TARGET_MARCH=$C_TARGET_ARCH \
@@ -137,10 +151,10 @@ if [ "$USE_MUSL_CROSSMAKE" = "yes" ]; then
   ####
 fi
 
-export CC=$ROOT_DIR/1.2.5/bin/musl-gcc
+export CC="$SYSROOT_PREFIX/bin/musl-gcc"
 
-export CFLAGS="-I$ROOT_DIR/1.2.5/include -I/usr/include/$LINUX_ARCH_DIR"
-export LDFLAGS="-L$ROOT_DIR/1.2.5/lib"
+export CFLAGS="-I$SYSROOT_PREFIX/include -I/usr/include/$LINUX_ARCH_DIR"
+export LDFLAGS="-L$SYSROOT_PREFIX/lib"
 
 export CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O2 -ffat-lto-objects -fstack-protector-strong -Wl,-z,relro,-z,now -Wa,--noexecstack -D_FORTIFY_SOURCE=2 $SECURITY_CFLAGS $CFLAGS"
 export LDFLAGS="-ffat-lto-objects $LDFLAGS"
@@ -163,7 +177,7 @@ cmake \
     -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
     -DCMAKE_C_COMPILER=$CC \
     -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -fPIC -O3 -ffat-lto-objects $SECURITY_CFLAGS" \
-    -DCMAKE_INSTALL_PREFIX=$ROOT_DIR/1.2.5 \
+    -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX" \
     ../..;
 make -j${JOBS} | tee buildlog.txt;
 make install;
@@ -188,7 +202,7 @@ fi
 
 make clean && \
   ./configure \
-    --prefix=$ROOT_DIR/1.2.5 \
+    --prefix="$SYSROOT_PREFIX" \
     --enable-optimize=internal,malloc,string \
   && make -j${JOBS} \
     CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3 -ffat-lto-objects -fno-plt -fstack-protector-strong -fomit-frame-pointer -Wl,-z,relro,-z,now $SECURITY_CFLAGS" \
@@ -229,7 +243,7 @@ else
     --const \
     --64 \
     --static \
-    --prefix=$ROOT_DIR/1.2.5 \
+    --prefix="$SYSROOT_PREFIX" \
     && make -j${JOBS} \
     && make install
   popd;
@@ -266,8 +280,8 @@ else
       enable-tls1_3 \
       threads \
       -static \
-      --prefix=$ROOT_DIR/1.2.5 \
-      --openssldir=$ROOT_DIR/1.2.5/ssl \
+      --prefix="$SYSROOT_PREFIX" \
+      --openssldir="$SYSROOT_PREFIX/ssl" \
       CC="$CC" \
       CXX="$CXX";
 
@@ -290,7 +304,7 @@ else
   rm -fv buildlog.txt;
 
   ./configure \
-    --prefix=$ROOT_DIR/1.2.5 \
+    --prefix="$SYSROOT_PREFIX" \
     --enable-all \
     --enable-static \
     --enable-fts5 \
@@ -312,10 +326,10 @@ else
   cd capnp/c++;
   autoreconf -i;
   ./configure \
-    --prefix=$ROOT_DIR/1.2.5 \
+    --prefix="$SYSROOT_PREFIX" \
     --with-zlib \
     --with-openssl \
-    --with-sysroot=$ROOT_DIR/1.2.5;
+    --with-sysroot="$SYSROOT_PREFIX";
   make -j${JOBS} check
   make install
   cd -;
@@ -325,9 +339,9 @@ set +x -e
 sleep 1
 
 echo "Verifying..."
-file $ROOT_DIR/1.2.5/bin/musl-gcc || exit 2
-file $ROOT_DIR/1.2.5/lib/libc.a || exit 2
-file $ROOT_DIR/1.2.5/lib/libz.a || exit 3
+file "$SYSROOT_PREFIX/bin/musl-gcc" || exit 2
+file "$SYSROOT_PREFIX/lib/libc.a" || exit 2
+file "$SYSROOT_PREFIX/lib/libz.a" || exit 3
 
 if [ "$ARCH_FLAVOR" = "amd64" ]; then
   OPENSSL_LIB_DIR="lib64"
@@ -335,39 +349,39 @@ else
   OPENSSL_LIB_DIR="lib"
 fi
 
-file $ROOT_DIR/1.2.5/$OPENSSL_LIB_DIR/libssl.a || exit 4
+file "$SYSROOT_PREFIX/$OPENSSL_LIB_DIR/libssl.a" || exit 4
 
 echo "Verification complete."
 
 echo "Build complete."
 echo "-----------------------------------------------"
-echo "Musl Sysroot (1.2.5-patched.2):"
-echo "  Location: $ROOT_DIR/1.2.5"
+echo "Musl Sysroot (${MUSL_VERSION}+p3):"
+echo "  Location: $SYSROOT_PREFIX"
 echo "  Compiler: $MUSL_GCC"
 echo "  Arch:     $C_TARGET_ARCH"
 echo "  Tune:     $C_TARGET_TUNE"
 echo ""
 echo "Compiler flags:"
-echo "  CFLAGS:   -I$ROOT_DIR/1.2.5/include"
-echo "  LDFLAGS:  -L$ROOT_DIR/1.2.5/lib -static"
-echo "  CC:       $ROOT_DIR/1.2.5/bin/musl-gcc"
+echo "  CFLAGS:   -I$SYSROOT_PREFIX/include"
+echo "  LDFLAGS:  -L$SYSROOT_PREFIX/lib -static"
+echo "  CC:       $SYSROOT_PREFIX/bin/musl-gcc"
 echo "  CFLAGS:   $CFLAGS"
 echo "  LDFLAGS:  $LDFLAGS"
 echo ""
 echo "Components:"
 echo "  mimalloc:   3.1.5"
-echo "  libc:       $(file $ROOT_DIR/1.2.5/lib/libc.a)"
+echo "  libc:       $(file "$SYSROOT_PREFIX/lib/libc.a")"
 if [ "$BUILD_ZLIB" = "yes" ]; then
-  echo "  zlib:       (cloudflare@gcc.amd64) $(file $ROOT_DIR/1.2.5/lib/libz.a)"
+  echo "  zlib:       (cloudflare@gcc.amd64) $(file "$SYSROOT_PREFIX/lib/libz.a")"
 fi
 if [ "$BUILD_OPENSSL" = "yes" ]; then
-  echo "  openssl:    3.6.0 $(file $ROOT_DIR/1.2.5/lib64/libssl.a)"
+  echo "  openssl:    3.6.0 $(file "$SYSROOT_PREFIX/lib64/libssl.a")"
 fi
 if [ "$BUILD_SQLITE" = "yes" ]; then
-  echo "  sqlite:     3.51.0 $(file $ROOT_DIR/1.2.5/lib/libsqlite3.a)"
+  echo "  sqlite:     3.51.0 $(file "$SYSROOT_PREFIX/lib/libsqlite3.a")"
 fi
 if [ "$BUILD_CAPNP" = "yes" ]; then
-  echo "  capnp:      v1.3.0 $(file $ROOT_DIR/1.2.5/lib/libcapnp.a)"
+  echo "  capnp:      v1.3.0 $(file "$SYSROOT_PREFIX/lib/libcapnp.a")"
 fi
 echo ""
 echo "Features:"
