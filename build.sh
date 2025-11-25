@@ -5,7 +5,7 @@
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
-# - Zstd: (coming soon)
+# - Zstd: 1.5.7
 # - SQLite: 3.51.0
 # - LLVM: 21.1.2
 
@@ -16,7 +16,7 @@ set -e
 
 ## Components.
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
-BUILD_ZSTD=${BUILD_ZSTD:-no}
+BUILD_ZSTD=${BUILD_ZSTD:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_LLVM=${BUILD_LLVM:-yes}
 BUILD_SQLITE=${BUILD_SQLITE:-yes}
@@ -30,14 +30,14 @@ SECURE=${SECURE:-OFF}
 GUARDED=${GUARDED:-OFF}
 CFI=${CFI:-no}
 MPK=${MPK:-no}
-LLVM_PROJECTS="clang;lld;bolt"
+LLVM_PROJECTS="clang;lld"
 
 ## Advanced settings.
 USE_MUSL_CROSSMAKE=${USE_MUSL_CROSSMAKE:-yes}
 USE_SCCACHE=${USE_SCCACHE:-yes}
 USE_LTO=${USE_LTO:-no}
 USE_WIDE_VECTORS=${USE_WIDE_VECTORS:-no}
-CLEAN_BEFORE_BUILD=${CLEAN_BEFORE_BUILD:-no}
+CLEAN_BEFORE_BUILD=${CLEAN_BEFORE_BUILD:-yes}
 MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
 MAKE_SYMLINK=${MAKE_SYMLINK:-no}
 
@@ -340,6 +340,31 @@ fi
 
 ### Build zstd (coming soon)
 
+if [ "$BUILD_ZSTD" != "yes" ]; then
+  echo "Skipping zstd build.";
+else
+  echo "------- Building zstd...";
+  pushd zstd;
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    rm -fr build-cmake;
+    make clean || echo "Nothing to clean.";
+  fi
+  cmake -S . -B build-cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX" \
+    -DCMAKE_C_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-gcc" \
+    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    -DZSTD_BUILD_SHARED=OFF \
+    -DZSTD_BUILD_STATIC=ON \
+    -DZSTD_MULTITHREAD_SUPPORT=ON \
+    && cmake --build build-cmake \
+    && cmake --install build-cmake;
+
+  popd;
+fi
+
 ### Build LLVM
 if [ "$BUILD_LLVM" != "yes" ]; then
   echo "Skipping LLVM build.";
@@ -381,13 +406,30 @@ else
     -DLLVM_DEFAULT_TARGET_TRIPLE="$MUSL_TARGET" \
     -DLIBCLANG_BUILD_STATIC=ON \
     -DCLANG_LINK_CLANG_DYLIB=OFF \
+    -DCMAKE_SYSROOT="$SYSROOT_PREFIX/$LINUX_ARCH_DIR" \
+    -DCMAKE_FIND_ROOT_PATH="$SYSROOT_PREFIX" \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+    -DZLIB_INCLUDE_DIR="$SYSROOT_PREFIX/include" \
+    -DZLIB_LIBRARY="$SYSROOT_PREFIX/lib/libz.a" \
+    -Dzstd_INCLUDE_DIR="$SYSROOT_PREFIX/include" \
+    -Dzstd_LIBRARY="$SYSROOT_PREFIX/lib/libzstd.a" \
+    -DLLVM_ENABLE_LIBXML2=OFF \
+    -DLLVM_ENABLE_BACKTRACES=OFF \
+    -DLLVM_ENABLE_LIBEDIT=OFF \
+    -DLLVM_ENABLE_TERMINFO=OFF \
+    -DLLVM_ENABLE_LIBPFM=OFF \
     -DCMAKE_EXE_LINKER_FLAGS="-static -L$SYSROOT_PREFIX/$LINUX_ARCH_DIR/lib -latomic" \
     -DCMAKE_SHARED_LINKER_FLAGS="-L$SYSROOT_PREFIX/$LINUX_ARCH_DIR/lib -latomic" \
     -DCMAKE_MODULE_LINKER_FLAGS="-L$SYSROOT_PREFIX/$LINUX_ARCH_DIR/lib -latomic" \
     -DLLVM_INTEGRATED_CRT_ALLOC=OFF \
     -DLLVM_ENABLE_RTTI=ON \
     && make -j `nproc` \
-    && make install;
+    && make install \
+    && echo "LLVM build complete." \
+    && sleep 3;
   popd;
 fi
 
@@ -528,7 +570,7 @@ if [ "$BUILD_ZLIB" = "yes" ]; then
   echo "  zlib:       (cloudflare@gcc.amd64) $(file "$SYSROOT_PREFIX/lib/libz.a")"
 fi
 if [ "$BUILD_ZSTD" = "yes" ]; then
-  echo "  zstd:       (coming soon) $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
+  echo "  zstd:       1.5.7 $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
 fi
 if [ "$BUILD_OPENSSL" = "yes" ]; then
   echo "  openssl:    3.6.0 $(file "$SYSROOT_PREFIX/$OPENSSL_LIB_DIR/libssl.a")"

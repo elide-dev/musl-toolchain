@@ -39,3 +39,6 @@
 	branch = b708aea0bc7127adf4ec643660699c8bcdde1273
 	shallow = true
 	ignore = dirty
+[submodule "zstd"]
+	path = zstd
+	url = https://github.com/facebook/zstd.git
