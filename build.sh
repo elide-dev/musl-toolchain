@@ -5,7 +5,7 @@
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
-# - Zstd: 1.5.7
+# - Zstd: d462f691ba6a53bd17de492656af7878c73288c8
 # - SQLite: 3.51.0
 # - LLVM: 21.1.2
 
@@ -570,7 +570,7 @@ if [ "$BUILD_ZLIB" = "yes" ]; then
   echo "  zlib:       (cloudflare@gcc.amd64) $(file "$SYSROOT_PREFIX/lib/libz.a")"
 fi
 if [ "$BUILD_ZSTD" = "yes" ]; then
-  echo "  zstd:       1.5.7 $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
+  echo "  zstd:       c73288c8 $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
 fi
 if [ "$BUILD_OPENSSL" = "yes" ]; then
   echo "  openssl:    3.6.0 $(file "$SYSROOT_PREFIX/$OPENSSL_LIB_DIR/libssl.a")"
