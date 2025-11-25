@@ -305,8 +305,8 @@ else
   export CXX="$MUSL_GCC"
 fi
 
-export CFLAGS="$CFLAGS -O3 -flto=auto"
-export LDFLAGS="$LDFLAGS -flto=auto -static"
+export CFLAGS="$CFLAGS -O3 -fno-lto"
+export LDFLAGS="$LDFLAGS -fno-lto -static"
 
 ## Build zlib
 
