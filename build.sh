@@ -35,6 +35,7 @@ LLVM_PROJECTS="clang;lld;bolt"
 ## Advanced settings.
 USE_MUSL_CROSSMAKE=${USE_MUSL_CROSSMAKE:-yes}
 USE_SCCACHE=${USE_SCCACHE:-yes}
+USE_LTO=${USE_LTO:-no}
 USE_WIDE_VECTORS=${USE_WIDE_VECTORS:-no}
 CLEAN_BEFORE_BUILD=${CLEAN_BEFORE_BUILD:-no}
 MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
@@ -56,6 +57,7 @@ OPT_CFLAGS="-O2 -ffat-lto-objects -fno-semantic-interposition"
 SECURITY_CFLAGS="-fno-plt -fstack-protector-strong -fstack-clash-protection -fomit-frame-pointer -D_FORTIFY_SOURCE=2 -Wa,--noexecstack"
 OPT_LDFLAGS=""
 SECURITY_LDFLAGS="-Wl,-z,relro,-z,now,-z,separate-code"
+LTO_CFLAGS="-flto=auto"
 
 unset CC
 unset CFLAGS
@@ -83,6 +85,7 @@ echo "LLVM_PROJECTS=$LLVM_PROJECTS"
 echo ""
 echo "USE_MUSL_CROSSMAKE=$USE_MUSL_CROSSMAKE"
 echo "USE_SCCACHE=$USE_SCCACHE"
+echo "USE_LTO=$USE_LTO"
 echo "USE_WIDE_VECTORS=$USE_WIDE_VECTORS"
 echo "CLEAN_BEFORE_BUILD=$CLEAN_BEFORE_BUILD"
 echo "MUSL_USE_MIMALLOC=$MUSL_USE_MIMALLOC"
@@ -305,8 +308,13 @@ else
   export CXX="$MUSL_GCC"
 fi
 
-export CFLAGS="$CFLAGS -O3 -fno-lto"
-export LDFLAGS="$LDFLAGS -fno-lto -static"
+export CFLAGS="$CFLAGS -O3"
+export LDFLAGS="$LDFLAGS -static"
+
+if [ "$USE_LTO" = "yes" ]; then
+  export CFLAGS="$CFLAGS $LTO_CFLAGS"
+  export LDFLAGS="$LDFLAGS $LTO_CFLAGS"
+fi
 
 ## Build zlib
 
