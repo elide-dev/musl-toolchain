@@ -12,7 +12,7 @@
 # Eventual goal:
 # LLVM_PROJECTS="clang;clang-tools-extra;lldb;lld;bolt"
 
-set -e
+set -e -o pipefail
 
 ## Components.
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
@@ -100,7 +100,7 @@ sleep 1
 echo "1..."
 sleep 1
 
-set -e -x
+set -e -o pipefail -x
 
 # if musl version is empty, fail
 if [ -z "$MUSL_VERSION" ]; then
