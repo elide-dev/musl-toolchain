@@ -23,7 +23,7 @@ jobs:
             tune: znver4
             runner: linux-amd64-cipool
           - arch: arm64
-            target: armv8.4-a+crypto+sve
+            target: armv8.4-a+crypto+crc
             tune: neoverse-v1
             runner: linux-arm64-cipool
     steps:
