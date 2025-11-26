@@ -12,6 +12,18 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 - [`capnp`](https://capnproto.org/) (cap'n'proto), latest version, built against musl
 - [`llvm`](https://github.com/llvm/llvm-project), matching our rustc version, built against musl
 
+#### Architectures
+
+This toolchain is built for `x86-64` and `aarch64` targets, with the following `march`/`mtune` settings:
+
+| Architecture        | Target                 | Tune      | Notes                    |
+| ------------------- | ---------------------- | --------- | ------------------------ |
+| `amd64` / `x86-64`  | `x86-64-v4`            | `znver4`  | Targets AMD Zen 4+       |
+| `arm64` / `aarch64` | `armv8.2-a+crypto+crc` | `generic` | Targets Ampere Altra+    |
+
+> [!CAUTION]
+> This is an intentionally over-modern architecture matrix, for now.
+
 #### Toolchain
 
 The following versions are pinned/established by this toolchain:
