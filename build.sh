@@ -329,11 +329,17 @@ else
     git clean -xdf
     make clean || echo "Nothing to clean.";
   fi
+  if [ "$ARCH_FLAVOR" = "arm64" ]; then
+    ZLIB_FLAGS=""
+  else
+    ZLIB_FLAGS="--64"
+  fi
+
   ./configure \
+    --prefix="$SYSROOT_PREFIX" \
     --const \
-    --64 \
     --static \
-    --prefix="$SYSROOT_PREFIX";
+    $ZLIB_FLAGS;
   make -j${JOBS};
   make install;
   popd;
