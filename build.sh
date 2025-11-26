@@ -331,10 +331,10 @@ else
     git clean -xdf
     make clean || echo "Nothing to clean.";
   fi
-  if [ "$ARCH_FLAVOR" = "arm64" ]; then
-    ZLIB_FLAGS=""
-  else
+  if [ "$ARCH_FLAVOR" = "x86_64" ]; then
     ZLIB_FLAGS="--64"
+  else
+    ZLIB_FLAGS=""
   fi
 
   ./configure \
