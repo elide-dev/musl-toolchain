@@ -212,6 +212,8 @@ if [ "$USE_MUSL_CROSSMAKE" = "yes" ]; then
     make clean || echo "Nothing to clean.";
   fi
 
+  echo "Building 'musl-cross-make'..."
+
   make -j${JOBS} \
     MUSL_ARCH="$ARCH_FLAVOR" \
     OUTPUT="$SYSROOT_PREFIX" \
@@ -222,7 +224,7 @@ if [ "$USE_MUSL_CROSSMAKE" = "yes" ]; then
     HARDEN=$HARDEN \
     CFI=$CFI \
     MPK=$MPK \
-    install | tee buildlog.txt;
+    install 2>&1 > buildlog.txt;
 
   popd;
   ####
