@@ -176,17 +176,17 @@ rm -fr mimalloc;
 make distclean || true
 rm -f config.mak
 
-make clean && \
-  ./configure \
-    --prefix="$SYSROOT_PREFIX" \
-    --with-malloc=mallocng \
-    --enable-optimize=internal,malloc,string \
-  && make -j${JOBS} \
-    CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-    CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-    CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-    ADD_CFI=$CFI \
-    | tee buildlog.txt;
+make clean;
+./configure \
+  --prefix="$SYSROOT_PREFIX" \
+  --with-malloc=mallocng \
+  --enable-optimize=internal,malloc,string
+make -j${JOBS} \
+  CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+  CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+  CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+  ADD_CFI=$CFI \
+  | tee buildlog.txt;
 
 # Debug: Check detected architecture
 echo "=== Musl Configuration ==="
@@ -278,17 +278,18 @@ if [ "$BUILD_STAGE2" = "yes" ]; then
     echo "Not using mimalloc in musl build.";
   fi
 
-  make clean && \
-    ./configure \
-      --prefix="$SYSROOT_PREFIX" \
-      --enable-optimize=internal,malloc,string \
-    && make -j${JOBS} \
-      CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-      CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-      CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-      USE_MIMALLOC=$MUSL_USE_MIMALLOC \
-      ADD_CFI=$CFI \
-      | tee buildlog.txt;
+  make clean;
+  ./configure \
+    --prefix="$SYSROOT_PREFIX" \
+    --enable-optimize=internal,malloc,string;
+
+  make -j${JOBS} \
+    CFLAGS_AUTO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    CFLAGS_MEMOPS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    USE_MIMALLOC=$MUSL_USE_MIMALLOC \
+    ADD_CFI=$CFI \
+    | tee buildlog.txt;
 
   make install;
 
@@ -332,9 +333,9 @@ else
     --const \
     --64 \
     --static \
-    --prefix="$SYSROOT_PREFIX" \
-    && make -j${JOBS} \
-    && make install
+    --prefix="$SYSROOT_PREFIX";
+  make -j${JOBS};
+  make install;
   popd;
 fi
 
@@ -358,9 +359,9 @@ else
     -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
     -DZSTD_BUILD_SHARED=OFF \
     -DZSTD_BUILD_STATIC=ON \
-    -DZSTD_MULTITHREAD_SUPPORT=ON \
-    && cmake --build build-cmake \
-    && cmake --install build-cmake;
+    -DZSTD_MULTITHREAD_SUPPORT=ON;
+  cmake --build build-cmake;
+  cmake --install build-cmake;
 
   popd;
 fi
@@ -428,11 +429,11 @@ else
     -DCMAKE_SHARED_LINKER_FLAGS="-L$SYSROOT_PREFIX/$LINUX_ARCH_DIR/lib -latomic" \
     -DCMAKE_MODULE_LINKER_FLAGS="-L$SYSROOT_PREFIX/$LINUX_ARCH_DIR/lib -latomic" \
     -DLLVM_INTEGRATED_CRT_ALLOC=OFF \
-    -DLLVM_ENABLE_RTTI=ON \
-    && make -j `nproc` \
-    && make install \
-    && echo "LLVM build complete." \
-    && sleep 3;
+    -DLLVM_ENABLE_RTTI=ON;
+  make -j `nproc`;
+  make install;
+  echo "LLVM build complete.";
+  sleep 3;
   popd;
 fi
 
