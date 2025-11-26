@@ -24,7 +24,7 @@ jobs:
             runner: linux-amd64-cipool
           - arch: arm64
             target: armv8.2-a+crypto+crc
-            tune: neoverse-v1
+            tune: generic
             runner: linux-arm64-cipool
     steps:
       - name: "Setup: Harden Runner"
