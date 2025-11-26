@@ -566,15 +566,15 @@ echo "  LDFLAGS:  $LDFLAGS"
 echo ""
 echo "Components:"
 echo "  mimalloc:   3.1.5"
-echo "  libc:       $(file "$SYSROOT_PREFIX/lib/libc.a")"
+echo "  libc:       1.2.5+p3 $(file "$SYSROOT_PREFIX/lib/libc.a")"
 if [ "$BUILD_LLVM" = "yes" ]; then
   echo "  llvm:       21.1.2 $(file "$SYSROOT_PREFIX/bin/clang")"
 fi
 if [ "$BUILD_ZLIB" = "yes" ]; then
-  echo "  zlib:       (cloudflare@gcc.amd64) $(file "$SYSROOT_PREFIX/lib/libz.a")"
+  echo "  zlib:       1252e25 (cloudflare@gcc.amd64) $(file "$SYSROOT_PREFIX/lib/libz.a")"
 fi
 if [ "$BUILD_ZSTD" = "yes" ]; then
-  echo "  zstd:       c73288c8 $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
+  echo "  zstd:       c73288c8 (facebook@dev) $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
 fi
 if [ "$BUILD_OPENSSL" = "yes" ]; then
   echo "  openssl:    3.6.0 $(file "$SYSROOT_PREFIX/$OPENSSL_LIB_DIR/libssl.a")"
