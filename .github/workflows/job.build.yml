@@ -21,7 +21,7 @@ jobs:
           - arch: amd64
             target: x86-64-v4
             tune: znver4
-            runner: linux-amd64-cipool
+            runner: ubuntu-latest-32-cores
           - arch: arm64
             target: armv8.2-a+crypto+crc
             tune: generic
