@@ -5,6 +5,7 @@
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
+# - Zlib-Ng: 2.3.1
 # - Zstd: d462f691ba6a53bd17de492656af7878c73288c8
 # - SQLite: 3.51.0
 # - LLVM: 21.1.2
@@ -16,6 +17,7 @@ set -e -o pipefail
 
 ## Components.
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
+BUILD_ZLIB_NG=${BUILD_ZLIB_NG:-yes}
 BUILD_ZSTD=${BUILD_ZSTD:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_LLVM=${BUILD_LLVM:-yes}
@@ -68,6 +70,7 @@ source ./vars.sh || echo "No vars; using defaults."
 echo "-----------------------------------------------"
 echo "Musl toolchain:"
 echo "BUILD_ZLIB=$BUILD_ZLIB"
+echo "BUILD_ZLIB_NG=$BUILD_ZLIB_NG"
 echo "BUILD_ZSTD=$BUILD_ZSTD"
 echo "BUILD_OPENSSL=$BUILD_OPENSSL"
 echo "BUILD_LLVM=$BUILD_LLVM"
@@ -347,6 +350,31 @@ else
   popd;
 fi
 
+## Build zlib-ng
+
+if [ "$BUILD_ZLIB_NG" != "yes" ]; then
+  echo "Skipping zlib-ng build.";
+else
+  echo "------- Building zlib-ng...";
+  pushd zlib-ng;
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    rm -fr build;
+    git checkout .
+    git clean -xdf
+    make clean || echo "Nothing to clean.";
+  fi
+
+  ./configure \
+    --prefix="$SYSROOT_PREFIX" \
+    --static;
+  make -j${JOBS};
+  make install;
+  popd;
+  popd;
+fi
+
+exit 0;
+
 ### Build zstd (coming soon)
 
 if [ "$BUILD_ZSTD" != "yes" ]; then
@@ -580,6 +608,9 @@ if [ "$BUILD_LLVM" = "yes" ]; then
 fi
 if [ "$BUILD_ZLIB" = "yes" ]; then
   echo "  zlib:       1252e25 (cloudflare@gcc.amd64) $(file "$SYSROOT_PREFIX/lib/libz.a")"
+fi
+if [ "$BUILD_ZLIB_NG" = "yes" ]; then
+  echo "  zlib-ng:    2.3.1 $(file "$SYSROOT_PREFIX/lib/libz-ng.a")"
 fi
 if [ "$BUILD_ZSTD" = "yes" ]; then
   echo "  zstd:       c73288c8 (facebook@dev) $(file "$SYSROOT_PREFIX/lib/libzstd.a")"

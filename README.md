@@ -6,6 +6,7 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 - [`mimalloc`](https://github.com/microsoft/mimalloc), which is built with stage1 musl gcc, then injected at stage2
 - [`musl`](https://github.com/elide-tools/musl), built with latest patches and then injected with mimalloc
 - [`zlib`](https://github.com/cloudflare/zlib), cloudflare's optimized fork
+- [`zlib-ng`](https://github.com/zlib-ng/zlib-ng), at latest, with compat turned off
 - [`zstd`](https://github.com/facebook/zstd), compression algo from meta
 - [`openssl`](https://github.com/openssl/openssl), with optimizations turned on
 - [`sqlite`](https://github.com/sqlite/sqlite), latest version, properly built for musl, optimizations on
@@ -42,6 +43,7 @@ The following versions are pinned/established by this toolchain:
 | Mimalloc     | `3.1.5`                | |
 | OpenSSL      | `3.6.0`                | |
 | Zlib         | `cloudflare@gcc.amd64` | Cloudflare's accelerated fork of `zlib` |
+| ZlibNg       | `2.3.1`                | |
 | Zstd         | `1.5.7`                | |
 | SQLite       | `3.51.0`               | |
 | Cap'n'Proto  | `master` (`v1`)        | "v1 with bugfixes" (`v2` is unsupported in Java)       |

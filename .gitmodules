@@ -42,3 +42,8 @@
 [submodule "zstd"]
 	path = zstd
 	url = https://github.com/facebook/zstd.git
+[submodule "zlib-ng"]
+	path = zlib-ng
+	url = https://github.com/zlib-ng/zlib-ng.git
+	ignore = dirty
+	shallow = true
