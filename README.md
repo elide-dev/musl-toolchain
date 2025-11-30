@@ -32,23 +32,24 @@ The following versions are pinned/established by this toolchain:
 
 | **Software** | **Version**            | **Notes**                                              |
 | ------------ | ---------------------- | ------------------------------------------------------ |
-| GCC          | `15.2.0`               | Upgraded in line with Ubuntu build machines (`25.10`)  |
 | Binutils     | `2.44`                 | GCC dependencies |
+| Brotli       | `1.2.0`                | |
+| Cap'n'Proto  | `master` (`v1`)        | "v1 with bugfixes" (`v2` is unsupported in Java)       |
+| Clang/LLVM   | `21.1.2`               | Matches pinned `rustc` toolchain version               |
+| GCC          | `15.2.0`               | Upgraded in line with Ubuntu build machines (`25.10`)  |
 | GMP          | `6.3.0`                | GCC dependencies |
-| MPC          | `1.3.1`                | GCC dependencies |
-| MPFR         | `4.2.2`                | GCC dependencies |
 | ISL          | `0.27`                 | GCC dependencies |
 | Linux        | `6.15.7`               | Kernel headers only |
-| Clang/LLVM   | `21.1.2`               | Matches pinned `rustc` toolchain version               |
-| Musl Libc    | `1.2.5+p3`             | Latest + two upstream patches + Elide's singular patch |
 | Mimalloc     | `3.1.5`                | |
+| MPC          | `1.3.1`                | GCC dependencies |
+| MPFR         | `4.2.2`                | GCC dependencies |
+| Musl Libc    | `1.2.5+p3`             | Latest + two upstream patches + Elide's singular patch |
 | OpenSSL      | `3.6.0`                | |
-| Brotli       | `1.2.0`                | |
+| Snappy       | `1.2.2`                | |
+| SQLite       | `3.51.0`               | |
 | Zlib         | `cloudflare@gcc.amd64` | Cloudflare's accelerated fork of `zlib` |
 | ZlibNg       | `2.3.1`                | |
 | Zstd         | `1.5.7`                | |
-| SQLite       | `3.51.0`               | |
-| Cap'n'Proto  | `master` (`v1`)        | "v1 with bugfixes" (`v2` is unsupported in Java)       |
 
 ### Usage
 

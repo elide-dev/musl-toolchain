@@ -52,3 +52,8 @@
 	url = https://github.com/google/brotli.git
 	ignore = dirty
 	shallow = true
+[submodule "snappy"]
+	path = snappy
+	url = https://github.com/google/snappy.git
+	ignore = dirty
+	shallow = true

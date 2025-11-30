@@ -5,6 +5,7 @@
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
 # - Brotli: 1.2.0
+# - Snappy: 1.2.2
 # - Zlib: Cloudflare Zlib @gcc.amd64
 # - Zlib-Ng: 2.3.1
 # - Zstd: d462f691ba6a53bd17de492656af7878c73288c8
@@ -20,6 +21,7 @@ set -e -o pipefail
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
 BUILD_ZLIB_NG=${BUILD_ZLIB_NG:-yes}
 BUILD_BROTLI=${BUILD_BROTLI:-yes}
+BUILD_SNAPPY=${BUILD_SNAPPY:-yes}
 BUILD_ZSTD=${BUILD_ZSTD:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_LLVM=${BUILD_LLVM:-yes}
@@ -74,6 +76,7 @@ echo "Musl toolchain:"
 echo "BUILD_ZLIB=$BUILD_ZLIB"
 echo "BUILD_ZLIB_NG=$BUILD_ZLIB_NG"
 echo "BUILD_BROTLI=$BUILD_BROTLI"
+echo "BUILD_SNAPPY=$BUILD_SNAPPY"
 echo "BUILD_ZSTD=$BUILD_ZSTD"
 echo "BUILD_OPENSSL=$BUILD_OPENSSL"
 echo "BUILD_LLVM=$BUILD_LLVM"
@@ -426,6 +429,36 @@ else
   popd;
 fi
 
+## Build Snappy
+if [ "$BUILD_SNAPPY" != "yes" ]; then
+  echo "Skipping snappy build.";
+else
+  echo "------- Building snappy...";
+  pushd snappy;
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    rm -fr build-cmake;
+    make clean || echo "Nothing to clean.";
+  fi
+  mkdir -p build-cmake;
+  pushd build-cmake;
+  cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX" \
+    -DCMAKE_C_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-gcc" \
+    -DCMAKE_CXX_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-g++" \
+    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    -DCMAKE_CXX_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    -DSNAPPY_BUILD_TESTS=OFF \
+    -DSNAPPY_BUILD_BENCHMARKS=OFF \
+    -DBUILD_SHARED_LIBS=OFF;
+  make -j${JOBS};
+  make install;
+  popd;
+  popd;
+fi
+
 ### Build LLVM
 if [ "$BUILD_LLVM" != "yes" ]; then
   echo "Skipping LLVM build.";
@@ -639,6 +672,9 @@ fi
 if [ "$BUILD_BROTLI" = "yes" ]; then
   echo "  brotli:     1.2.0 $(file "$SYSROOT_PREFIX/lib/libbrotlidec.a")"
 fi
+if [ "$BUILD_SNAPPY" = "yes" ]; then
+  echo "  snappy:     1.2.2 $(file "$SYSROOT_PREFIX/lib/libsnappy.a")"
+fi
 if [ "$BUILD_ZSTD" = "yes" ]; then
   echo "  zstd:       c73288c8 (facebook@dev) $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
 fi
@@ -665,7 +701,6 @@ echo "-----------------------------------------------"
 
 if [ "$MAKE_SYMLINK" != "yes" ]; then
   echo "Skipping symlink creation.";
-  exit 0;
 else
   sudo ln -s $HOME/workspace/musl/latest/bin/musl-gcc /usr/bin/x86_64-linux-musl-gcc || echo "Link exists."
 fi
