@@ -62,3 +62,8 @@
 	url = https://github.com/sqlcipher/sqlcipher.git
 	ignore = dirty
 	shallow = true
+[submodule "hiredis"]
+	path = hiredis
+	url = https://github.com/redis/hiredis.git
+	ignore = dirty
+	shallow = true

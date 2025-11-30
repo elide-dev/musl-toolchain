@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 
 # Active versions:
-# - Musl: 1.2.5 (patched)
-# - Mimalloc: 3.1.5
-# - OpenSSL: 3.6.0
 # - Brotli: 1.2.0
+# - Hiredis: 1.3.0
+# - LLVM: 21.1.2
+# - Mimalloc: 3.1.5
+# - Musl: 1.2.5 (patched)
+# - OpenSSL: 3.6.0
 # - Snappy: 1.2.2
-# - Zlib: Cloudflare Zlib @gcc.amd64
-# - Zlib-Ng: 2.3.1
-# - Zstd: d462f691ba6a53bd17de492656af7878c73288c8
 # - SQLCipher: 4.11.0
 # - SQLite: 3.51.0
-# - LLVM: 21.1.2
+# - Zlib-Ng: 2.3.1
+# - Zlib: Cloudflare Zlib @gcc.amd64
+# - Zstd: d462f691ba6a53bd17de492656af7878c73288c8
 
 # Eventual goal:
 # LLVM_PROJECTS="clang;clang-tools-extra;lldb;lld;bolt"
@@ -19,17 +20,18 @@
 set -e -o pipefail
 
 ## Components.
-BUILD_ZLIB=${BUILD_ZLIB:-yes}
-BUILD_ZLIB_NG=${BUILD_ZLIB_NG:-yes}
 BUILD_BROTLI=${BUILD_BROTLI:-yes}
-BUILD_SNAPPY=${BUILD_SNAPPY:-yes}
-BUILD_ZSTD=${BUILD_ZSTD:-yes}
-BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
-BUILD_LLVM=${BUILD_LLVM:-yes}
-BUILD_SQLITE=${BUILD_SQLITE:-yes}
-BUILD_SQLCIPHER=${BUILD_SQLCIPHER:-yes}
 BUILD_CAPNP=${BUILD_CAPNP:-no}
+BUILD_HIREDIS=${BUILD_HIREDIS:-yes}
+BUILD_LLVM=${BUILD_LLVM:-yes}
+BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
+BUILD_SNAPPY=${BUILD_SNAPPY:-yes}
+BUILD_SQLCIPHER=${BUILD_SQLCIPHER:-yes}
+BUILD_SQLITE=${BUILD_SQLITE:-yes}
 BUILD_STAGE2=${BUILD_STAGE2:-yes}
+BUILD_ZLIB_NG=${BUILD_ZLIB_NG:-yes}
+BUILD_ZLIB=${BUILD_ZLIB:-yes}
+BUILD_ZSTD=${BUILD_ZSTD:-yes}
 
 ## Settings.
 RELEASE=${RELEASE:-no}
@@ -75,17 +77,18 @@ source ./vars.sh || echo "No vars; using defaults."
 
 echo "-----------------------------------------------"
 echo "Musl toolchain:"
-echo "BUILD_ZLIB=$BUILD_ZLIB"
-echo "BUILD_ZLIB_NG=$BUILD_ZLIB_NG"
 echo "BUILD_BROTLI=$BUILD_BROTLI"
-echo "BUILD_SNAPPY=$BUILD_SNAPPY"
-echo "BUILD_ZSTD=$BUILD_ZSTD"
-echo "BUILD_OPENSSL=$BUILD_OPENSSL"
-echo "BUILD_LLVM=$BUILD_LLVM"
-echo "BUILD_SQLITE=$BUILD_SQLITE"
-echo "BUILD_SQLCIPHER=$BUILD_SQLCIPHER"
 echo "BUILD_CAPNP=$BUILD_CAPNP"
+echo "BUILD_HIREDIS=$BUILD_HIREDIS"
+echo "BUILD_LLVM=$BUILD_LLVM"
+echo "BUILD_OPENSSL=$BUILD_OPENSSL"
+echo "BUILD_SNAPPY=$BUILD_SNAPPY"
+echo "BUILD_SQLCIPHER=$BUILD_SQLCIPHER"
+echo "BUILD_SQLITE=$BUILD_SQLITE"
 echo "BUILD_STAGE2=$BUILD_STAGE2"
+echo "BUILD_ZLIB_NG=$BUILD_ZLIB_NG"
+echo "BUILD_ZLIB=$BUILD_ZLIB"
+echo "BUILD_ZSTD=$BUILD_ZSTD"
 echo ""
 echo "RELEASE=$RELEASE"
 echo "HARDEN=$HARDEN"
@@ -659,6 +662,31 @@ else
   cd -;
 fi
 
+### Build hiredis
+
+if [ "$BUILD_HIREDIS" != "yes" ]; then
+  echo "Skipping hiredis build.";
+else
+  pushd hiredis;
+  echo "------- Building hiredis...";
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    make clean || echo "Nothing to clean.";
+  fi
+  make \
+    -j${JOBS} \
+    USE_SSL=1 \
+    CFLAGS="-Wno-error=stringop-overflow $CFLAGS" \
+    PREFIX="$SYSROOT_PREFIX" \
+    OPTIMIZATION=-O3 \
+    static pkgconfig install \
+    | tee buildlog.txt;
+  popd;
+fi
+
+### ======= Done.
+
 set +x -e
 sleep 1
 
@@ -724,6 +752,9 @@ if [ "$BUILD_SQLCIPHER" = "yes" ]; then
 fi
 if [ "$BUILD_CAPNP" = "yes" ]; then
   echo "  capnp:      v1.3.0 $(file "$SYSROOT_PREFIX/lib/libcapnp.a")"
+fi
+if [ "$BUILD_HIREDIS" = "yes" ]; then
+  echo "  hiredis:    1.3.0 $(file "$SYSROOT_PREFIX/lib/libhiredis.a")"
 fi
 echo ""
 echo "Features:"
