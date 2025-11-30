@@ -3,15 +3,16 @@
 
 This project prepares a libc musl toolchain from scratch, for use with Elide and general Native Image projects which target `linux-amd64`. Prepackaged are the following libraries, all built from sources, with consistent `CFLAGS` and compat with musl:
 
-- [`mimalloc`](https://github.com/microsoft/mimalloc), which is built with stage1 musl gcc, then injected at stage2
-- [`musl`](https://github.com/elide-tools/musl), built with latest patches and then injected with mimalloc
-- [`zlib`](https://github.com/cloudflare/zlib), cloudflare's optimized fork
-- [`zlib-ng`](https://github.com/zlib-ng/zlib-ng), at latest, with compat turned off
-- [`zstd`](https://github.com/facebook/zstd), compression algo from meta
-- [`openssl`](https://github.com/openssl/openssl), with optimizations turned on
-- [`sqlite`](https://github.com/sqlite/sqlite), latest version, properly built for musl, optimizations on
+- [`brotli`](https://github.com/google/brotli), latest, built against musl
 - [`capnp`](https://capnproto.org/) (cap'n'proto), latest version, built against musl
 - [`llvm`](https://github.com/llvm/llvm-project), matching our rustc version, built against musl
+- [`mimalloc`](https://github.com/microsoft/mimalloc), which is built with stage1 musl gcc, then injected at stage2
+- [`musl`](https://github.com/elide-tools/musl), built with latest patches and then injected with mimalloc
+- [`openssl`](https://github.com/openssl/openssl), with optimizations turned on
+- [`sqlite`](https://github.com/sqlite/sqlite), latest version, properly built for musl, optimizations on
+- [`zlib-ng`](https://github.com/zlib-ng/zlib-ng), at latest, with compat turned off
+- [`zlib`](https://github.com/cloudflare/zlib), cloudflare's optimized fork
+- [`zstd`](https://github.com/facebook/zstd), compression algo from meta
 
 #### Architectures
 
@@ -42,6 +43,7 @@ The following versions are pinned/established by this toolchain:
 | Musl Libc    | `1.2.5+p3`             | Latest + two upstream patches + Elide's singular patch |
 | Mimalloc     | `3.1.5`                | |
 | OpenSSL      | `3.6.0`                | |
+| Brotli       | `1.2.0`                | |
 | Zlib         | `cloudflare@gcc.amd64` | Cloudflare's accelerated fork of `zlib` |
 | ZlibNg       | `2.3.1`                | |
 | Zstd         | `1.5.7`                | |

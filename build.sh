@@ -4,6 +4,7 @@
 # - Musl: 1.2.5 (patched)
 # - Mimalloc: 3.1.5
 # - OpenSSL: 3.6.0
+# - Brotli: 1.2.0
 # - Zlib: Cloudflare Zlib @gcc.amd64
 # - Zlib-Ng: 2.3.1
 # - Zstd: d462f691ba6a53bd17de492656af7878c73288c8
@@ -18,6 +19,7 @@ set -e -o pipefail
 ## Components.
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
 BUILD_ZLIB_NG=${BUILD_ZLIB_NG:-yes}
+BUILD_BROTLI=${BUILD_BROTLI:-yes}
 BUILD_ZSTD=${BUILD_ZSTD:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_LLVM=${BUILD_LLVM:-yes}
@@ -71,6 +73,7 @@ echo "-----------------------------------------------"
 echo "Musl toolchain:"
 echo "BUILD_ZLIB=$BUILD_ZLIB"
 echo "BUILD_ZLIB_NG=$BUILD_ZLIB_NG"
+echo "BUILD_BROTLI=$BUILD_BROTLI"
 echo "BUILD_ZSTD=$BUILD_ZSTD"
 echo "BUILD_OPENSSL=$BUILD_OPENSSL"
 echo "BUILD_LLVM=$BUILD_LLVM"
@@ -358,7 +361,6 @@ else
   echo "------- Building zlib-ng...";
   pushd zlib-ng;
   if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
-    rm -fr build;
     git checkout .
     git clean -xdf
     make clean || echo "Nothing to clean.";
@@ -370,12 +372,9 @@ else
   make -j${JOBS};
   make install;
   popd;
-  popd;
 fi
 
-exit 0;
-
-### Build zstd (coming soon)
+### Build zstd
 
 if [ "$BUILD_ZSTD" != "yes" ]; then
   echo "Skipping zstd build.";
@@ -396,6 +395,31 @@ else
     -DZSTD_BUILD_SHARED=OFF \
     -DZSTD_BUILD_STATIC=ON \
     -DZSTD_MULTITHREAD_SUPPORT=ON;
+  cmake --build build-cmake;
+  cmake --install build-cmake;
+
+  popd;
+fi
+
+## Build brotli
+if [ "$BUILD_BROTLI" != "yes" ]; then
+  echo "Skipping brotli build.";
+else
+  echo "------- Building brotli...";
+  pushd brotli;
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    rm -fr build-cmake;
+    make clean || echo "Nothing to clean.";
+  fi
+  cmake -S . -B build-cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX" \
+    -DCMAKE_C_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-gcc" \
+    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_STATIC_LIBS=ON;
   cmake --build build-cmake;
   cmake --install build-cmake;
 
@@ -611,6 +635,9 @@ if [ "$BUILD_ZLIB" = "yes" ]; then
 fi
 if [ "$BUILD_ZLIB_NG" = "yes" ]; then
   echo "  zlib-ng:    2.3.1 $(file "$SYSROOT_PREFIX/lib/libz-ng.a")"
+fi
+if [ "$BUILD_BROTLI" = "yes" ]; then
+  echo "  brotli:     1.2.0 $(file "$SYSROOT_PREFIX/lib/libbrotlidec.a")"
 fi
 if [ "$BUILD_ZSTD" = "yes" ]; then
   echo "  zstd:       c73288c8 (facebook@dev) $(file "$SYSROOT_PREFIX/lib/libzstd.a")"
