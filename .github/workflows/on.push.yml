@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: "ci-main-${{ github.ref }}"
+  cancel-in-progress: false
+
 env:
   RUSTC_WRAPPER: "sccache"
 
