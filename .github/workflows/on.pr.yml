@@ -9,6 +9,10 @@ permissions:
 env:
   RUSTC_WRAPPER: "sccache"
 
+concurrency:
+  group: "ci-pr-${{ github.event.number }}"
+  cancel-in-progress: false
+
 jobs:
   build:
     name: "Toolchain"
