@@ -421,8 +421,7 @@ else
     -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX" \
     -DCMAKE_C_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-gcc" \
     -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DBUILD_STATIC_LIBS=ON;
+    -DBUILD_SHARED_LIBS=OFF;
   cmake --build build-cmake;
   cmake --install build-cmake;
 
@@ -523,7 +522,7 @@ else
     -DCMAKE_MODULE_LINKER_FLAGS="-L$SYSROOT_PREFIX/$LINUX_ARCH_DIR/lib -latomic" \
     -DLLVM_INTEGRATED_CRT_ALLOC=OFF \
     -DLLVM_ENABLE_RTTI=ON;
-  make -j `nproc`;
+  make -j${JOBS};
   make install;
   echo "LLVM build complete.";
   sleep 3;

@@ -9,6 +9,7 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 - [`mimalloc`](https://github.com/microsoft/mimalloc), which is built with stage1 musl gcc, then injected at stage2
 - [`musl`](https://github.com/elide-tools/musl), built with latest patches and then injected with mimalloc
 - [`openssl`](https://github.com/openssl/openssl), with optimizations turned on
+- [`snappy`](https://github.com/google/snappy), latest, built against musl
 - [`sqlite`](https://github.com/sqlite/sqlite), latest version, properly built for musl, optimizations on
 - [`zlib-ng`](https://github.com/zlib-ng/zlib-ng), at latest, with compat turned off
 - [`zlib`](https://github.com/cloudflare/zlib), cloudflare's optimized fork
