@@ -5,6 +5,7 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 
 - [`brotli`](https://github.com/google/brotli), latest, built against musl
 - [`capnp`](https://capnproto.org/) (cap'n'proto), latest version, built against musl
+- [`crc32c`](https://github.com/google/crc32c), latest version, built against musl
 - [`hiredis`](https://github.com/redis/hiredis), built against musl with optimizations on
 - [`leveldb`](https://github.com/google/leveldb), built against musl with optimizations on
 - [`llvm`](https://github.com/llvm/llvm-project), matching our rustc version, built against musl
@@ -40,6 +41,7 @@ The following versions are pinned/established by this toolchain:
 | Brotli       | `1.2.0`                | |
 | Cap'n'Proto  | `master` (`v1`)        | "v1 with bugfixes" (`v2` is unsupported in Java)       |
 | Clang/LLVM   | `21.1.2`               | Matches pinned `rustc` toolchain version               |
+| CRC32C       | `1.1.2`                | LevelDB dependencies |
 | GCC          | `15.2.0`               | Upgraded in line with Ubuntu build machines (`25.10`)  |
 | GMP          | `6.3.0`                | GCC dependencies |
 | Hiredis      | `1.3.0`                | |

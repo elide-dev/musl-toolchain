@@ -2,6 +2,7 @@
 
 # Active versions:
 # - Brotli: 1.2.0
+# - CRC32C: 1.1.2
 # - Hiredis: 1.3.0
 # - LevelDB: 1.23
 # - LLVM: 21.1.2
@@ -23,6 +24,7 @@ set -e -o pipefail
 ## Components.
 BUILD_BROTLI=${BUILD_BROTLI:-yes}
 BUILD_CAPNP=${BUILD_CAPNP:-no}
+BUILD_CRC32C=${BUILD_CRC32C:-yes}
 BUILD_HIREDIS=${BUILD_HIREDIS:-yes}
 BUILD_LEVELDB=${BUILD_LEVELDB:-yes}
 BUILD_LLVM=${BUILD_LLVM:-yes}
@@ -81,6 +83,7 @@ echo "-----------------------------------------------"
 echo "Musl toolchain:"
 echo "BUILD_BROTLI=$BUILD_BROTLI"
 echo "BUILD_CAPNP=$BUILD_CAPNP"
+echo "BUILD_CRC32C=$BUILD_CRC32C"
 echo "BUILD_HIREDIS=$BUILD_HIREDIS"
 echo "BUILD_LEVELDB=$BUILD_LEVELDB"
 echo "BUILD_LLVM=$BUILD_LLVM"
@@ -688,6 +691,36 @@ else
   popd;
 fi
 
+### CRC32C
+if [ "$BUILD_CRC32C" != "yes" ]; then
+  echo "Skipping crc32c build.";
+else
+  pushd crc32c;
+  echo "------- Building crc32c...";
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    make clean || echo "Nothing to clean.";
+  fi
+
+  mkdir -p build;
+  pushd build;
+  cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX" \
+    -DCMAKE_C_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-gcc" \
+    -DCMAKE_CXX_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-g++" \
+    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    -DCMAKE_CXX_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    -DBUILD_SHARED_LIBS=0 \
+    -DCRC32C_BUILD_TESTS=0 \
+    -DCRC32C_BUILD_BENCHMARKS=0;
+  make -j${JOBS};
+  make install;
+  popd;
+  popd;
+fi
+
 ### Build leveldb
 
 if [ "$BUILD_LEVELDB" != "yes" ]; then
@@ -789,6 +822,9 @@ if [ "$BUILD_CAPNP" = "yes" ]; then
 fi
 if [ "$BUILD_HIREDIS" = "yes" ]; then
   echo "  hiredis:    1.3.0 $(file "$SYSROOT_PREFIX/lib/libhiredis.a")"
+fi
+if [ "$BUILD_CRC32C" = "yes" ]; then
+  echo "  crc32c:     1.1.2 $(file "$SYSROOT_PREFIX/lib/libcrc32c.a")"
 fi
 if [ "$BUILD_LEVELDB" = "yes" ]; then
   echo "  leveldb:    1.23 $(file "$SYSROOT_PREFIX/lib/libleveldb.a")"

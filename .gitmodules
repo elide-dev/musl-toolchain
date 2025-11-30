@@ -72,3 +72,9 @@
 	url = https://github.com/google/leveldb.git
 	ignore = dirty
 	shallow = true
+[submodule "crc32c"]
+	path = crc32c
+	url = https://github.com/google/crc32c.git
+	ignore = dirty
+	shallow = true
+	fetchRecurseSubmodules = true
