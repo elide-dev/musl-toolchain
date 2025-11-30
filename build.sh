@@ -9,6 +9,7 @@
 # - Zlib: Cloudflare Zlib @gcc.amd64
 # - Zlib-Ng: 2.3.1
 # - Zstd: d462f691ba6a53bd17de492656af7878c73288c8
+# - SQLCipher: 4.11.0
 # - SQLite: 3.51.0
 # - LLVM: 21.1.2
 
@@ -26,6 +27,7 @@ BUILD_ZSTD=${BUILD_ZSTD:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_LLVM=${BUILD_LLVM:-yes}
 BUILD_SQLITE=${BUILD_SQLITE:-yes}
+BUILD_SQLCIPHER=${BUILD_SQLCIPHER:-yes}
 BUILD_CAPNP=${BUILD_CAPNP:-no}
 BUILD_STAGE2=${BUILD_STAGE2:-yes}
 
@@ -81,6 +83,7 @@ echo "BUILD_ZSTD=$BUILD_ZSTD"
 echo "BUILD_OPENSSL=$BUILD_OPENSSL"
 echo "BUILD_LLVM=$BUILD_LLVM"
 echo "BUILD_SQLITE=$BUILD_SQLITE"
+echo "BUILD_SQLCIPHER=$BUILD_SQLCIPHER"
 echo "BUILD_CAPNP=$BUILD_CAPNP"
 echo "BUILD_STAGE2=$BUILD_STAGE2"
 echo ""
@@ -242,7 +245,7 @@ fi
 export CC="$SYSROOT_PREFIX/bin/musl-gcc"
 
 export CFLAGS="-I$SYSROOT_PREFIX/include -I/usr/include/$LINUX_ARCH_DIR -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS $CFLAGS"
-export LDFLAGS="-L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS"
+export LDFLAGS="-L$SYSROOT_PREFIX/lib -L$SYSROOT_PREFIX/lib64 $OPT_LDFLAGS $SECURITY_LDFLAGS"
 
 # Add LDFLAGS here if needed.
 # export LDFLAGS="$LDFLAGS"
@@ -593,6 +596,39 @@ else
     --enable-static \
     --enable-fts5 \
     --enable-threadsafe \
+    --with-tempstore=yes \
+    --disable-tcl \
+    --disable-shared;
+
+  make -j$JOBS | tee buildlog.txt;
+  make install;
+  popd;
+fi
+
+### Build sqlcipher
+
+if [ "$BUILD_SQLCIPHER" != "yes" ]; then
+  echo "Skipping sqlcipher build.";
+else
+  echo "------- Building sqlcipher...";
+  pushd sqlcipher;
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    make clean || echo "No clean step";
+  fi
+  rm -fv buildlog.txt;
+
+  ./configure \
+    CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_EXTRA_INIT=sqlcipher_extra_init -DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown $CFLAGS" \
+    LDFLAGS="$LDFLAGS -lcrypto" \
+    --prefix="$SYSROOT_PREFIX" \
+    --enable-all \
+    --enable-static \
+    --enable-fts5 \
+    --enable-threadsafe \
+    --with-tempstore=yes \
+    --disable-tcl \
     --disable-shared;
 
   make -j$JOBS | tee buildlog.txt;
@@ -682,6 +718,9 @@ if [ "$BUILD_OPENSSL" = "yes" ]; then
 fi
 if [ "$BUILD_SQLITE" = "yes" ]; then
   echo "  sqlite:     3.51.0 $(file "$SYSROOT_PREFIX/lib/libsqlite3.a")"
+fi
+if [ "$BUILD_SQLCIPHER" = "yes" ]; then
+  echo "  sqlcipher:  4.11.0 $(file "$SYSROOT_PREFIX/lib/libsqlcipher.a")"
 fi
 if [ "$BUILD_CAPNP" = "yes" ]; then
   echo "  capnp:      v1.3.0 $(file "$SYSROOT_PREFIX/lib/libcapnp.a")"

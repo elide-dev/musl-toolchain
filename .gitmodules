@@ -57,3 +57,8 @@
 	url = https://github.com/google/snappy.git
 	ignore = dirty
 	shallow = true
+[submodule "sqlcipher"]
+	path = sqlcipher
+	url = https://github.com/sqlcipher/sqlcipher.git
+	ignore = dirty
+	shallow = true

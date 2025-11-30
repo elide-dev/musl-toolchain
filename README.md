@@ -10,6 +10,7 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 - [`musl`](https://github.com/elide-tools/musl), built with latest patches and then injected with mimalloc
 - [`openssl`](https://github.com/openssl/openssl), with optimizations turned on
 - [`snappy`](https://github.com/google/snappy), latest, built against musl
+- [`sqlcipher`](https://github.com/sqlcipher/sqlcipher), latest version, built for musl against openssl
 - [`sqlite`](https://github.com/sqlite/sqlite), latest version, properly built for musl, optimizations on
 - [`zlib-ng`](https://github.com/zlib-ng/zlib-ng), at latest, with compat turned off
 - [`zlib`](https://github.com/cloudflare/zlib), cloudflare's optimized fork
@@ -47,6 +48,7 @@ The following versions are pinned/established by this toolchain:
 | Musl Libc    | `1.2.5+p3`             | Latest + two upstream patches + Elide's singular patch |
 | OpenSSL      | `3.6.0`                | |
 | Snappy       | `1.2.2`                | |
+| SQLCipher    | `4.11.0`               | |
 | SQLite       | `3.51.0`               | |
 | Zlib         | `cloudflare@gcc.amd64` | Cloudflare's accelerated fork of `zlib` |
 | ZlibNg       | `2.3.1`                | |
