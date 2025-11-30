@@ -3,6 +3,7 @@
 # Active versions:
 # - Brotli: 1.2.0
 # - Hiredis: 1.3.0
+# - LevelDB: 1.23
 # - LLVM: 21.1.2
 # - Mimalloc: 3.1.5
 # - Musl: 1.2.5 (patched)
@@ -23,6 +24,7 @@ set -e -o pipefail
 BUILD_BROTLI=${BUILD_BROTLI:-yes}
 BUILD_CAPNP=${BUILD_CAPNP:-no}
 BUILD_HIREDIS=${BUILD_HIREDIS:-yes}
+BUILD_LEVELDB=${BUILD_LEVELDB:-yes}
 BUILD_LLVM=${BUILD_LLVM:-yes}
 BUILD_OPENSSL=${BUILD_OPENSSL:-yes}
 BUILD_SNAPPY=${BUILD_SNAPPY:-yes}
@@ -80,6 +82,7 @@ echo "Musl toolchain:"
 echo "BUILD_BROTLI=$BUILD_BROTLI"
 echo "BUILD_CAPNP=$BUILD_CAPNP"
 echo "BUILD_HIREDIS=$BUILD_HIREDIS"
+echo "BUILD_LEVELDB=$BUILD_LEVELDB"
 echo "BUILD_LLVM=$BUILD_LLVM"
 echo "BUILD_OPENSSL=$BUILD_OPENSSL"
 echo "BUILD_SNAPPY=$BUILD_SNAPPY"
@@ -685,6 +688,37 @@ else
   popd;
 fi
 
+### Build leveldb
+
+if [ "$BUILD_LEVELDB" != "yes" ]; then
+  echo "Skipping leveldb build.";
+else
+  pushd leveldb;
+  echo "------- Building leveldb...";
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    make clean || echo "Nothing to clean.";
+  fi
+
+  mkdir -p build;
+  pushd build;
+  cmake .. \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DLEVELDB_BUILD_TESTS=OFF \
+    -DLEVELDB_BUILD_BENCHMARKS=OFF \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX" \
+    -DCMAKE_C_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-gcc" \
+    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
+    -DCMAKE_CXX_COMPILER="$SYSROOT_PREFIX/bin/${MUSL_TARGET}-g++" \
+    -DCMAKE_CXX_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3";
+  make -j${JOBS};
+  make install;
+  popd;
+  popd;
+fi
+
 ### ======= Done.
 
 set +x -e
@@ -755,6 +789,9 @@ if [ "$BUILD_CAPNP" = "yes" ]; then
 fi
 if [ "$BUILD_HIREDIS" = "yes" ]; then
   echo "  hiredis:    1.3.0 $(file "$SYSROOT_PREFIX/lib/libhiredis.a")"
+fi
+if [ "$BUILD_LEVELDB" = "yes" ]; then
+  echo "  leveldb:    1.23 $(file "$SYSROOT_PREFIX/lib/libleveldb.a")"
 fi
 echo ""
 echo "Features:"

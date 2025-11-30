@@ -6,6 +6,7 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 - [`brotli`](https://github.com/google/brotli), latest, built against musl
 - [`capnp`](https://capnproto.org/) (cap'n'proto), latest version, built against musl
 - [`hiredis`](https://github.com/redis/hiredis), built against musl with optimizations on
+- [`leveldb`](https://github.com/google/leveldb), built against musl with optimizations on
 - [`llvm`](https://github.com/llvm/llvm-project), matching our rustc version, built against musl
 - [`mimalloc`](https://github.com/microsoft/mimalloc), which is built with stage1 musl gcc, then injected at stage2
 - [`musl`](https://github.com/elide-tools/musl), built with latest patches and then injected with mimalloc
@@ -43,6 +44,7 @@ The following versions are pinned/established by this toolchain:
 | GMP          | `6.3.0`                | GCC dependencies |
 | Hiredis      | `1.3.0`                | |
 | ISL          | `0.27`                 | GCC dependencies |
+| LevelDB      | `1.23`                 | |
 | Linux        | `6.15.7`               | Kernel headers only |
 | Mimalloc     | `3.1.5`                | |
 | MPC          | `1.3.1`                | GCC dependencies |

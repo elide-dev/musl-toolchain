@@ -67,3 +67,8 @@
 	url = https://github.com/redis/hiredis.git
 	ignore = dirty
 	shallow = true
+[submodule "leveldb"]
+	path = leveldb
+	url = https://github.com/google/leveldb.git
+	ignore = dirty
+	shallow = true
