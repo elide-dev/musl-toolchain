@@ -631,7 +631,7 @@ else
   ./configure \
     CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_EXTRA_INIT=sqlcipher_extra_init -DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown $CFLAGS" \
     LDFLAGS="$LDFLAGS -lcrypto" \
-    --prefix="$SYSROOT_PREFIX" \
+    --prefix="$SYSROOT_PREFIX/sqlcipher" \
     --enable-all \
     --enable-static \
     --enable-fts5 \
@@ -815,7 +815,7 @@ if [ "$BUILD_SQLITE" = "yes" ]; then
   echo "  sqlite:     3.51.0 $(file "$SYSROOT_PREFIX/lib/libsqlite3.a")"
 fi
 if [ "$BUILD_SQLCIPHER" = "yes" ]; then
-  echo "  sqlcipher:  4.11.0 $(file "$SYSROOT_PREFIX/lib/libsqlcipher.a")"
+  echo "  sqlcipher:  4.11.0 $(file "$SYSROOT_PREFIX/sqlcipher/lib/libsqlite3.a")"
 fi
 if [ "$BUILD_CAPNP" = "yes" ]; then
   echo "  capnp:      v1.3.0 $(file "$SYSROOT_PREFIX/lib/libcapnp.a")"
