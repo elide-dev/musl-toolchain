@@ -695,6 +695,7 @@ fi
 if [ "$BUILD_CRC32C" != "yes" ]; then
   echo "Skipping crc32c build.";
 else
+  git submodule update --init --depth=1 --recursive crc32c;
   pushd crc32c;
   echo "------- Building crc32c...";
   if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
