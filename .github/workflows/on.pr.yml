@@ -1,7 +1,10 @@
 name: PR
 
 on:
-  pull_request: {}
+  pull_request:
+    paths-ignore:
+      - 'action/**'
+      - 'action/*'
 
 permissions:
   contents: read

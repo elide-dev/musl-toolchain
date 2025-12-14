@@ -1,0 +1,19 @@
+name: Musl Toolchain
+description: Install Elide's musl toolchain in GHA
+
+inputs:
+  revision:
+    description: Revision
+  arch:
+    description: Target architecture
+    required: false
+    default: x86_64-linux-musl
+
+outputs:
+  musl-home:
+    description: Path to the installed toolchain
+
+runs:
+  using: bun1
+  main: main.ts
+
