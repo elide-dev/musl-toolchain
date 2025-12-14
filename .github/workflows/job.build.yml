@@ -55,11 +55,24 @@ jobs:
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
       - name: "Build: Toolchain"
         run: C_TARGET_ARCH=${{ matrix.target }} ARCH_FLAVOR=${{ matrix.arch }} C_TARGET_TUNE=generic ./build.sh
+      - name: "Package: Toolchain"
+        run: |
+          tar -cvf musl-toolchain.tar 1.2.5/
+          xz --best -9 --extreme -k -v musl-toolchain.tar
+          mv musl-toolchain.tar.xz musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz
+          sha256sum musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz > musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz.sha256
+      - name: "Provenance: Artifacts"
+        id: attest_artifacts
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: "musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz"
       - name: "Artifact: Toolchain"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         id: artifact
         with:
           name: musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}
-          path: 1.2.5/
           compression-level: 1
           overwrite: true
+          path: |
+            musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz
+            musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz.sha256
