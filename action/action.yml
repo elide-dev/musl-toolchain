@@ -5,7 +5,7 @@ inputs:
   revision:
     description: Revision
   arch:
-    description: Target architecture
+    description: Architecture
     required: false
     default: x86_64-linux-musl
 
