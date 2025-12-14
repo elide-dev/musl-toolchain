@@ -29,7 +29,7 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            target: x86-64-v4
+            target: x86-64-v3
             tune: znver4
             runner: ubuntu-latest-16-cores
           # - arch: arm64
