@@ -14,6 +14,6 @@ outputs:
     description: Path to the installed toolchain
 
 runs:
-  using: bun1
-  main: main.ts
+  using: node24
+  main: dist/main.js
 
