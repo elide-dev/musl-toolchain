@@ -1,0 +1,151 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:3e48943b-46a5-4b07-816d-701cde4c924b",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-01-15T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "manual",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "name": "elide-musl-toolchain",
+      "version": "1.0.0",
+      "description": "Musl-based cross-compilation toolchain for Elide/WHIPLASH",
+      "supplier": {
+        "name": "Elide",
+        "url": ["https://elide.dev"]
+      },
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:generic/elide/musl-toolchain@1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "musl",
+      "version": "1.2.5",
+      "description": "musl libc - lightweight standard C library",
+      "supplier": {
+        "name": "musl libc",
+        "url": ["https://musl.libc.org"]
+      },
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:generic/musl@1.2.5",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://musl.libc.org"
+        },
+        {
+          "type": "vcs",
+          "url": "git://git.musl-libc.org/musl"
+        },
+        {
+          "type": "distribution",
+          "url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "gcc",
+      "version": "15.2.0",
+      "description": "GNU Compiler Collection",
+      "supplier": {
+        "name": "GNU Project",
+        "url": ["https://gcc.gnu.org"]
+      },
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-3.0-or-later"
+          }
+        }
+      ],
+      "purl": "pkg:generic/gcc@15.2.0",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://gcc.gnu.org"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "llvm",
+      "version": "21.1.2",
+      "description": "LLVM Compiler Infrastructure",
+      "supplier": {
+        "name": "LLVM Project",
+        "url": ["https://llvm.org"]
+      },
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:generic/llvm@21.1.2"
+    },
+    {
+      "type": "application",
+      "name": "binutils",
+      "version": "2.44",
+      "description": "GNU Binary Utilities",
+      "supplier": {
+        "name": "GNU Project",
+        "url": ["https://www.gnu.org/software/binutils/"]
+      },
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-3.0-or-later"
+          }
+        }
+      ],
+      "purl": "pkg:generic/binutils@2.44"
+    },
+    {
+      "type": "library",
+      "name": "linux-headers",
+      "version": "6.12",
+      "description": "Linux kernel headers for userspace",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-only"
+          }
+        }
+      ],
+      "purl": "pkg:generic/linux-headers@6.12"
+    }
+  ]
+}

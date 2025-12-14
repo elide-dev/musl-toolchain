@@ -66,6 +66,12 @@ jobs:
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: "musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz"
+      - name: "Provenance: SBOM"
+        id: attest_sbom
+        uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34 # v3
+        with:
+          subject-path: "musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz"
+          sbom-path: "musl.sbom.json"
       - name: "Artifact: Toolchain"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         id: artifact
@@ -74,5 +80,6 @@ jobs:
           compression-level: 1
           overwrite: true
           path: |
+            musl.sbom.json
             musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz
             musl-toolchain-${{ steps.vars.outputs.sha_short }}-${{ matrix.arch }}.txz.sha256
