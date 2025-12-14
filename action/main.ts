@@ -113,10 +113,8 @@ async function configureEnvironment(toolchainRoot: string): Promise<void> {
   core.addPath(binDir);
   core.info(`Added ${binDir} to PATH`);
 
-  // Set outputs
+  // Set output
   core.setOutput("musl-home", toolchainRoot);
-  core.setOutput("cache-hit", tc.find(TOOL_NAME, "", "") ? "true" : "false");
 }
 
 run();
-

@@ -20808,6 +20808,5 @@ async function configureEnvironment(toolchainRoot) {
   core.addPath(binDir);
   core.info(`Added ${binDir} to PATH`);
   core.setOutput("musl-home", toolchainRoot);
-  core.setOutput("cache-hit", tc.find(TOOL_NAME, "", "") ? "true" : "false");
 }
 run();
