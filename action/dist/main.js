@@ -20734,6 +20734,12 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 var BASE_URL = "https://static.elideusercontent.com";
 var TOOL_NAME = "musl-toolchain";
+function toSemver(revision) {
+  if (/^\d+\.\d+\.\d+/.test(revision)) {
+    return revision;
+  }
+  return `0.0.0+${revision}`;
+}
 async function computeSha256(filePath) {
   const content = await readFile(filePath);
   return createHash("sha256").update(content).digest("hex");
@@ -20750,12 +20756,14 @@ async function run() {
   try {
     const revision = core.getInput("revision", { required: true });
     const arch = core.getInput("arch") || "x86_64-linux-musl";
+    const version = toSemver(revision);
     const toolchainFilename = `${TOOL_NAME}-${revision}-${arch}.txz`;
     const toolchainUrl = `${BASE_URL}/${toolchainFilename}`;
     const sha256Url = `${toolchainUrl}.sha256`;
     core.info(`Musl toolchain revision: ${revision}`);
+    core.info(`Cache version: ${version}`);
     core.info(`Architecture: ${arch}`);
-    const cachedPath = tc.find(TOOL_NAME, revision, arch);
+    const cachedPath = tc.find(TOOL_NAME, version, arch);
     if (cachedPath) {
       core.info(`Found cached toolchain at: ${cachedPath}`);
       await configureEnvironment(cachedPath);
@@ -20785,7 +20793,7 @@ async function run() {
     ]);
     core.info(`Extracted to: ${extractedPath}`);
     core.info("Caching toolchain...");
-    const toolchainRoot = await tc.cacheDir(extractedPath, TOOL_NAME, revision, arch);
+    const toolchainRoot = await tc.cacheDir(extractedPath, TOOL_NAME, version, arch);
     core.info(`Cached toolchain at: ${toolchainRoot}`);
     await configureEnvironment(toolchainRoot);
   } catch (error) {
