@@ -121,6 +121,9 @@ sleep 1
 echo "1..."
 sleep 1
 
+echo "Symlinking 'latest'...";
+ln -s "$MUSL_VERSION" latest;
+
 set -e -o pipefail -x
 
 # if musl version is empty, fail
