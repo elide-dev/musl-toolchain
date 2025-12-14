@@ -5,6 +5,8 @@ on:
     paths-ignore:
       - 'action/**'
       - 'action/*'
+      - '**/*.md'
+      - '.github/workflows/*'
 
 permissions:
   contents: read
