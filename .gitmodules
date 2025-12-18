@@ -78,3 +78,8 @@
 	ignore = dirty
 	shallow = true
 	fetchRecurseSubmodules = true
+[submodule "lz4"]
+	path = lz4
+	url = git@github.com:lz4/lz4.git
+	ignore = dirty
+	shallow = true

@@ -9,6 +9,7 @@ This project prepares a libc musl toolchain from scratch, for use with Elide and
 - [`hiredis`](https://github.com/redis/hiredis), built against musl with optimizations on
 - [`leveldb`](https://github.com/google/leveldb), built against musl with optimizations on
 - [`llvm`](https://github.com/llvm/llvm-project), matching our rustc version, built against musl
+- [`lz4`](https://github.com/lz4/lz4), built against musl
 - [`mimalloc`](https://github.com/microsoft/mimalloc), which is built with stage1 musl gcc, then injected at stage2
 - [`musl`](https://github.com/elide-tools/musl), built with latest patches and then injected with mimalloc
 - [`openssl`](https://github.com/openssl/openssl), with optimizations turned on
@@ -48,6 +49,8 @@ The following versions are pinned/established by this toolchain:
 | ISL          | `0.27`                 | GCC dependencies |
 | LevelDB      | `1.23`                 | |
 | Linux        | `6.15.7`               | Kernel headers only |
+| LLVM         | `20.x`                 | |
+| LZ4          | `1.10.0`               | |
 | Mimalloc     | `3.1.5`                | |
 | MPC          | `1.3.1`                | GCC dependencies |
 | MPFR         | `4.2.2`                | GCC dependencies |

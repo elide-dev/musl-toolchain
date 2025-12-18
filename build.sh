@@ -6,6 +6,7 @@
 # - Hiredis: 1.3.0
 # - LevelDB: 1.23
 # - LLVM: 21.1.2
+# - LZ4: 1.10.0
 # - Mimalloc: 3.1.5
 # - Musl: 1.2.5 (patched)
 # - OpenSSL: 3.6.0
@@ -36,6 +37,7 @@ BUILD_STAGE2=${BUILD_STAGE2:-yes}
 BUILD_ZLIB_NG=${BUILD_ZLIB_NG:-yes}
 BUILD_ZLIB=${BUILD_ZLIB:-yes}
 BUILD_ZSTD=${BUILD_ZSTD:-yes}
+BUILD_LZ4=${BUILD_LZ4:-yes}
 
 ## Settings.
 RELEASE=${RELEASE:-no}
@@ -95,6 +97,7 @@ echo "BUILD_STAGE2=$BUILD_STAGE2"
 echo "BUILD_ZLIB_NG=$BUILD_ZLIB_NG"
 echo "BUILD_ZLIB=$BUILD_ZLIB"
 echo "BUILD_ZSTD=$BUILD_ZSTD"
+echo "BUILD_LZ4=$BUILD_LZ4"
 echo ""
 echo "RELEASE=$RELEASE"
 echo "HARDEN=$HARDEN"
@@ -122,6 +125,7 @@ echo "1..."
 sleep 1
 
 echo "Symlinking 'latest'...";
+rm -fv latest;
 ln -s "$MUSL_VERSION" latest;
 
 set -e -o pipefail -x
@@ -475,6 +479,25 @@ else
   make -j${JOBS};
   make install;
   popd;
+  popd;
+fi
+
+### Build lz4
+
+if [ "$BUILD_LZ4" != "yes" ]; then
+  echo "Skipping lz4 build.";
+else
+  echo "------- Building lz4...";
+  pushd lz4;
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    rm -fr build-cmake;
+    make clean || echo "Nothing to clean.";
+  fi
+
+  make PREFIX="$SYSROOT_PREFIX" -j${JOBS};
+  make PREFIX="$SYSROOT_PREFIX" install;
   popd;
 fi
 
@@ -837,6 +860,9 @@ if [ "$BUILD_CRC32C" = "yes" ]; then
 fi
 if [ "$BUILD_LEVELDB" = "yes" ]; then
   echo "  leveldb:    1.23 $(file "$SYSROOT_PREFIX/lib/libleveldb.a")"
+fi
+if [ "$BUILD_LZ4" = "yes" ]; then
+  echo "  lz4:        1.10.0 $(file "$SYSROOT_PREFIX/lib/liblz4.a")"
 fi
 echo ""
 echo "Features:"
