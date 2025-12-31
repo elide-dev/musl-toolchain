@@ -20179,7 +20179,7 @@ var require_retry_helper = __commonJS((exports) => {
 
 // node_modules/@actions/tool-cache/lib/tool-cache.js
 var require_tool_cache = __commonJS((exports) => {
-  var __dirname = "/home/sam/workspace/musl/action/node_modules/@actions/tool-cache/lib";
+  var __dirname = "/home/sam/workspace/toolchains/musl/action/node_modules/@actions/tool-cache/lib";
   var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
     if (k2 === undefined)
       k2 = k;
@@ -20758,7 +20758,7 @@ async function run() {
     const arch = core.getInput("arch") || "x86_64-linux-musl";
     const version = toSemver(revision);
     const toolchainFilename = `${TOOL_NAME}-${revision}-${arch}.txz`;
-    const toolchainUrl = `${BASE_URL}/${toolchainFilename}`;
+    const toolchainUrl = `${BASE_URL}/${TOOL_NAME}/${toolchainFilename}`;
     const sha256Url = `${toolchainUrl}.sha256`;
     core.info(`Musl toolchain revision: ${revision}`);
     core.info(`Cache version: ${version}`);

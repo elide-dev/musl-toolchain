@@ -43,7 +43,7 @@ async function run(): Promise<void> {
     const version = toSemver(revision);
 
     const toolchainFilename = `${TOOL_NAME}-${revision}-${arch}.txz`;
-    const toolchainUrl = `${BASE_URL}/${toolchainFilename}`;
+    const toolchainUrl = `${BASE_URL}/${TOOL_NAME}/${toolchainFilename}`;
     const sha256Url = `${toolchainUrl}.sha256`;
 
     core.info(`Musl toolchain revision: ${revision}`);
