@@ -39,8 +39,10 @@ async function parseHashFile(hashFilePath: string): Promise<string> {
 async function run(): Promise<void> {
   try {
     const revision = core.getInput("revision", { required: true });
+    const versionTarget = core.getInput("version") || "1.2.51";
+    const baselineVersion = core.getInput("baseline") || "1.2.5";
     const arch = core.getInput("arch") || "x86_64-linux-musl";
-    const version = toSemver(revision);
+    const version = toSemver(versionTarget || revision);
 
     const toolchainFilename = `${TOOL_NAME}-${revision}-${arch}.txz`;
     const toolchainUrl = `${BASE_URL}/${TOOL_NAME}/${toolchainFilename}`;
@@ -54,7 +56,7 @@ async function run(): Promise<void> {
     const cachedPath = tc.find(TOOL_NAME, version, arch);
     if (cachedPath) {
       core.info(`Found cached toolchain at: ${cachedPath}`);
-      await configureEnvironment(cachedPath);
+      await configureEnvironment(baselineVersion, cachedPath);
       return;
     }
 
@@ -100,7 +102,7 @@ async function run(): Promise<void> {
     );
     core.info(`Cached toolchain at: ${toolchainRoot}`);
 
-    await configureEnvironment(toolchainRoot);
+    await configureEnvironment(baselineVersion, toolchainRoot);
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);
@@ -110,8 +112,8 @@ async function run(): Promise<void> {
   }
 }
 
-async function configureEnvironment(toolchainRoot: string): Promise<void> {
-  const binDir = join(toolchainRoot, "bin");
+async function configureEnvironment(baselineVersion: string, toolchainRoot: string): Promise<void> {
+  const binDir = join(toolchainRoot, baselineVersion, "bin");
 
   // Verify bin directory exists
   try {
@@ -121,7 +123,7 @@ async function configureEnvironment(toolchainRoot: string): Promise<void> {
   }
 
   // Set MUSL_HOME environment variable
-  core.exportVariable("MUSL_HOME", toolchainRoot);
+  core.exportVariable("MUSL_HOME", join(toolchainRoot, baselineVersion));
   core.info(`Set MUSL_HOME=${toolchainRoot}`);
 
   // Add bin to PATH
@@ -133,4 +135,3 @@ async function configureEnvironment(toolchainRoot: string): Promise<void> {
 }
 
 run();
-

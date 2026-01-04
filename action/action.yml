@@ -4,6 +4,12 @@ description: Install Elide's musl toolchain in GHA
 inputs:
   revision:
     description: Revision
+  version:
+    description: Version
+    default: "1.2.51"
+  baseline:
+    description: Baseline
+    default: "1.2.5"
   arch:
     description: Architecture
     required: false
@@ -16,4 +22,3 @@ outputs:
 runs:
   using: node24
   main: dist/main.js
-

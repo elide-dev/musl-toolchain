@@ -20755,8 +20755,10 @@ async function parseHashFile(hashFilePath) {
 async function run() {
   try {
     const revision = core.getInput("revision", { required: true });
+    const versionTarget = core.getInput("version") || "1.2.51";
+    const baselineVersion = core.getInput("baseline") || "1.2.5";
     const arch = core.getInput("arch") || "x86_64-linux-musl";
-    const version = toSemver(revision);
+    const version = toSemver(versionTarget || revision);
     const toolchainFilename = `${TOOL_NAME}-${revision}-${arch}.txz`;
     const toolchainUrl = `${BASE_URL}/${TOOL_NAME}/${toolchainFilename}`;
     const sha256Url = `${toolchainUrl}.sha256`;
@@ -20766,7 +20768,7 @@ async function run() {
     const cachedPath = tc.find(TOOL_NAME, version, arch);
     if (cachedPath) {
       core.info(`Found cached toolchain at: ${cachedPath}`);
-      await configureEnvironment(cachedPath);
+      await configureEnvironment(baselineVersion, cachedPath);
       return;
     }
     core.info(`Toolchain not cached, downloading...`);
@@ -20795,7 +20797,7 @@ async function run() {
     core.info("Caching toolchain...");
     const toolchainRoot = await tc.cacheDir(extractedPath, TOOL_NAME, version, arch);
     core.info(`Cached toolchain at: ${toolchainRoot}`);
-    await configureEnvironment(toolchainRoot);
+    await configureEnvironment(baselineVersion, toolchainRoot);
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);
@@ -20804,14 +20806,14 @@ async function run() {
     }
   }
 }
-async function configureEnvironment(toolchainRoot) {
-  const binDir = join(toolchainRoot, "bin");
+async function configureEnvironment(baselineVersion, toolchainRoot) {
+  const binDir = join(toolchainRoot, baselineVersion, "bin");
   try {
     await io.which(binDir, false);
   } catch {
     core.warning(`bin directory may not exist at: ${binDir}`);
   }
-  core.exportVariable("MUSL_HOME", toolchainRoot);
+  core.exportVariable("MUSL_HOME", join(toolchainRoot, baselineVersion));
   core.info(`Set MUSL_HOME=${toolchainRoot}`);
   core.addPath(binDir);
   core.info(`Added ${binDir} to PATH`);
