@@ -123,15 +123,16 @@ async function configureEnvironment(baselineVersion: string, toolchainRoot: stri
   }
 
   // Set MUSL_HOME environment variable
-  core.exportVariable("MUSL_HOME", join(toolchainRoot, baselineVersion));
-  core.info(`Set MUSL_HOME=${toolchainRoot}`);
+  const muslHome = join(toolchainRoot, baselineVersion);
+  core.exportVariable("MUSL_HOME", muslHome);
+  core.info(`Set MUSL_HOME=${muslHome}`);
 
   // Add bin to PATH
   core.addPath(binDir);
   core.info(`Added ${binDir} to PATH`);
 
   // Set output
-  core.setOutput("musl-home", toolchainRoot);
+  core.setOutput("musl-home", muslHome);
 }
 
 run();

@@ -20813,10 +20813,11 @@ async function configureEnvironment(baselineVersion, toolchainRoot) {
   } catch {
     core.warning(`bin directory may not exist at: ${binDir}`);
   }
-  core.exportVariable("MUSL_HOME", join(toolchainRoot, baselineVersion));
-  core.info(`Set MUSL_HOME=${toolchainRoot}`);
+  const muslHome = join(toolchainRoot, baselineVersion);
+  core.exportVariable("MUSL_HOME", muslHome);
+  core.info(`Set MUSL_HOME=${muslHome}`);
   core.addPath(binDir);
   core.info(`Added ${binDir} to PATH`);
-  core.setOutput("musl-home", toolchainRoot);
+  core.setOutput("musl-home", muslHome);
 }
 run();
