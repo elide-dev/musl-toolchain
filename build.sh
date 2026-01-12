@@ -61,6 +61,11 @@ CLEAN_BEFORE_BUILD=${CLEAN_BEFORE_BUILD:-yes}
 MUSL_USE_MIMALLOC=${MUSL_USE_MIMALLOC:-yes}
 MAKE_SYMLINK=${MAKE_SYMLINK:-no}
 
+# LTO for musl itself - requires clang and enables cross-language LTO with Rust
+# When enabled, musl is built with clang -flto=thin, producing LLVM bitcode
+# that can be optimized together with Rust code at link time.
+MUSL_USE_LTO=${MUSL_USE_LTO:-no}
+
 MODERN_X86_64_ARCH_TARGET=x86-64-v3
 MODERN_X86_64_ARCH_TUNE=znver3
 MODERN_AARCH64_ARCH_TARGET=armv8.4-a+crypto+crc
@@ -100,7 +105,16 @@ fi
 if [ "$PREFER_COMPILER_FAMILY" = "clang" ]; then
   LTO_CFLAGS="$CLANG_LTOFLAGS"
   export CC=$(which clang)
-  export CXX=$(which clang++)
+  # Try to find clang++, or derive from clang path
+  export CXX=$(which clang++ 2>/dev/null)
+  if [ -z "$CXX" ] && [ -n "$CC" ]; then
+    # Derive clang++ path from clang (e.g., /usr/bin/clang -> /usr/bin/clang++)
+    CXX="${CC}++"
+    if [ ! -x "$CXX" ]; then
+      # Try clang++ in same directory
+      CXX="$(dirname "$CC")/clang++"
+    fi
+  fi
   export LD=$(which ld.lld 2>/dev/null || which ld)
   export AR=$(which llvm-ar 2>/dev/null || which ar)
   export NM=$(which llvm-nm 2>/dev/null || which nm)
@@ -120,12 +134,31 @@ if [ -z "$CC" ] || [ ! -x "$CC" ]; then
   echo "ERROR: C compiler not found: $PREFER_COMPILER_FAMILY"
   exit 1
 fi
+if [ -z "$CXX" ] || [ ! -x "$CXX" ]; then
+  echo "ERROR: C++ compiler not found: $PREFER_COMPILER_FAMILY"
+  exit 1
+fi
 if [ -z "$AR" ] || [ ! -x "$AR" ]; then
   echo "ERROR: Archiver (ar) not found"
   exit 1
 fi
 
+# Validate MUSL_USE_LTO requirements
+if [ "$MUSL_USE_LTO" = "yes" ]; then
+  if [ "$PREFER_COMPILER_FAMILY" != "clang" ]; then
+    echo "ERROR: MUSL_USE_LTO=yes requires PREFER_COMPILER_FAMILY=clang"
+    echo "Cross-language LTO with Rust requires LLVM bitcode (clang -flto=thin)"
+    exit 1
+  fi
+  # Verify llvm-ar is available (required for LTO bitcode in archives)
+  if ! which llvm-ar >/dev/null 2>&1; then
+    echo "ERROR: MUSL_USE_LTO=yes requires llvm-ar for LTO bitcode preservation"
+    exit 1
+  fi
+fi
+
 echo "Using bootstrap compiler: $CC"
+echo "Using C++ compiler: $CXX"
 echo "Using archiver: $AR"
 
 echo "-----------------------------------------------"
@@ -145,6 +178,9 @@ echo "BUILD_ZLIB_NG=$BUILD_ZLIB_NG"
 echo "BUILD_ZLIB=$BUILD_ZLIB"
 echo "BUILD_ZSTD=$BUILD_ZSTD"
 echo "BUILD_LZ4=$BUILD_LZ4"
+echo ""
+echo "MUSL_USE_MIMALLOC=$MUSL_USE_MIMALLOC"
+echo "MUSL_USE_LTO=$MUSL_USE_LTO"
 echo ""
 echo "RELEASE=$RELEASE"
 echo "HARDEN=$HARDEN"
@@ -329,6 +365,12 @@ run_cmake() {
   # CLANG_TARGET_FLAGS: compile-time flags (--target, --sysroot, --gcc-toolchain)
   # CLANG_LINK_FLAGS: link-time flags (same + -fuse-ld=lld)
   # (Both are empty for gcc builds)
+  
+  # LTO flags for cross-language optimization
+  local LTO_FLAGS=""
+  if [ "$MUSL_USE_LTO" = "yes" ]; then
+    LTO_FLAGS="-flto=thin"
+  fi
 
   local cmake_args=(
     -DCMAKE_BUILD_TYPE=Release
@@ -341,11 +383,11 @@ run_cmake() {
     -DCMAKE_RANLIB="$RANLIB"
     -DCMAKE_C_COMPILER_RANLIB="$RANLIB"
     -DCMAKE_CXX_COMPILER_RANLIB="$RANLIB"
-    -DCMAKE_C_FLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3"
-    -DCMAKE_CXX_FLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS $SECURITY_CXXFLAGS -O3"
-    -DCMAKE_EXE_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS"
-    -DCMAKE_SHARED_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS"
-    -DCMAKE_MODULE_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS"
+    -DCMAKE_C_FLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS $LTO_FLAGS -O3"
+    -DCMAKE_CXX_FLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS $SECURITY_CXXFLAGS $LTO_FLAGS -O3"
+    -DCMAKE_EXE_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS $LTO_FLAGS"
+    -DCMAKE_SHARED_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS $LTO_FLAGS"
+    -DCMAKE_MODULE_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS $LTO_FLAGS"
   )
 
   if [ "$USE_SCCACHE" = "yes" ]; then
@@ -550,6 +592,7 @@ if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
   
   GLUE_SRC="$ROOT_DIR/src/mimalloc-musl-glue.c"
   GLUE_OBJ="$ROOT_DIR/mimalloc/out/release/mimalloc-musl-glue.o"
+  MIMALLOC_INCLUDE="$ROOT_DIR/mimalloc/include"
   
   if [ ! -f "$GLUE_SRC" ]; then
     echo "ERROR: mimalloc-musl-glue.c not found at $GLUE_SRC"
@@ -557,13 +600,21 @@ if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
     exit 1
   fi
   
-  # Compile glue code with same flags as mimalloc, plus musl headers
+  # LTO flags for cross-language optimization (must match musl build)
+  GLUE_LTO_FLAGS=""
+  if [ "$MUSL_USE_LTO" = "yes" ]; then
+    GLUE_LTO_FLAGS="-flto=thin"
+  fi
+  
+  # Compile glue code with same flags as mimalloc, plus musl and mimalloc headers
   # CLANG_TARGET_FLAGS contains sysroot/gcc-toolchain for clang, empty for gcc
   $CC_NO_PREFIX -c -O3 -fPIC \
     $CLANG_TARGET_FLAGS \
+    $GLUE_LTO_FLAGS \
     -fno-fast-math -U_FORTIFY_SOURCE \
     -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE \
     -ffunction-sections -fdata-sections \
+    -I"$MIMALLOC_INCLUDE" \
     -I"$SYSROOT_PREFIX/include" \
     "$GLUE_SRC" \
     -o "$GLUE_OBJ"
@@ -601,6 +652,17 @@ else
   # The resulting clang/lld will be native glibc binaries that can target musl
   # via --target and --sysroot flags when invoked.
   
+  # Save current environment
+  SAVED_CC="$CC"
+  SAVED_CXX="$CXX"
+  SAVED_CFLAGS="$CFLAGS"
+  SAVED_CXXFLAGS="$CXXFLAGS"
+  SAVED_LDFLAGS="$LDFLAGS"
+  
+  # Clear environment to prevent musl sysroot contamination
+  # CMake may append environment CFLAGS/CXXFLAGS to CMAKE_*_FLAGS
+  unset CC CXX CFLAGS CXXFLAGS LDFLAGS
+  
   # Determine system compiler - prefer the one matching PREFER_COMPILER_FAMILY
   if [ "$PREFER_COMPILER_FAMILY" = "clang" ]; then
     LLVM_HOST_CC=$(which clang)
@@ -616,6 +678,33 @@ else
   
   echo "Building LLVM with host compiler: $LLVM_HOST_CC / $LLVM_HOST_CXX"
   
+  # Explicitly use host system headers/libraries, not musl sysroot
+  # For clang, we need to prevent it from auto-detecting the GCC in the musl sysroot
+  # and instead use the system GCC's libstdc++
+  LLVM_HOST_CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3"
+  LLVM_HOST_CXXFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3"
+  
+  # Note: We don't add --gcc-install-dir here because:
+  # 1. The environment is clean (no musl sysroot in CC/CXX/CFLAGS)
+  # 2. Clang will use its default search paths to find system GCC's libstdc++
+  # 3. --gcc-install-dir requires the actual gcc lib path (e.g., /usr/lib/gcc/x86_64-linux-gnu/13)
+  #    not just the prefix, and this varies by distro
+  
+  # Check for binutils plugin-api.h to build LLVMgold.so
+  # This allows GNU ld to perform LTO with LLVM bitcode
+  BINUTILS_INCDIR=""
+  for dir in /usr/include /usr/local/include; do
+    if [ -f "$dir/plugin-api.h" ]; then
+      BINUTILS_INCDIR="$dir"
+      echo "Found binutils plugin API at $BINUTILS_INCDIR - will build LLVMgold.so"
+      break
+    fi
+  done
+  if [ -z "$BINUTILS_INCDIR" ]; then
+    echo "WARNING: binutils plugin-api.h not found - LLVMgold.so will not be built"
+    echo "         Install binutils-dev/binutils-devel to enable GNU ld LTO support"
+  fi
+  
   LLVM_CMAKE_ARGS=(
     -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX"
@@ -623,9 +712,14 @@ else
     -DCMAKE_CXX_COMPILER="$LLVM_HOST_CXX"
     -DCMAKE_AR="$LLVM_HOST_AR"
     -DCMAKE_RANLIB="$LLVM_HOST_RANLIB"
-    -DCMAKE_C_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3"
-    -DCMAKE_CXX_FLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3"
+    -DCMAKE_C_FLAGS="$LLVM_HOST_CFLAGS"
+    -DCMAKE_CXX_FLAGS="$LLVM_HOST_CXXFLAGS"
   )
+  
+  # Add LLVMgold.so build if binutils headers available
+  if [ -n "$BINUTILS_INCDIR" ]; then
+    LLVM_CMAKE_ARGS+=(-DLLVM_BINUTILS_INCDIR="$BINUTILS_INCDIR")
+  fi
 
   if [ "$USE_SCCACHE" = "yes" ]; then
     LLVM_CMAKE_ARGS+=(
@@ -660,6 +754,14 @@ else
   make -j${JOBS}
   make install
   echo "LLVM build complete."
+  
+  # Restore environment
+  export CC="$SAVED_CC"
+  export CXX="$SAVED_CXX"
+  export CFLAGS="$SAVED_CFLAGS"
+  export CXXFLAGS="$SAVED_CXXFLAGS"
+  export LDFLAGS="$SAVED_LDFLAGS"
+  
   sleep 3
   popd
 fi
@@ -789,34 +891,72 @@ if [ "$BUILD_STAGE2" = "yes" ]; then
   # Unset to prevent any interference, then pass explicitly to configure
   unset CC CXX CFLAGS CXXFLAGS
 
-  # Pass CFLAGS directly on command line to ensure -fno-fast-math takes effect
-  # Use system GCC to avoid any specs issues with cross-compiler
-  #
+  # Determine compiler and flags for musl build
+  # When MUSL_USE_LTO=yes, use clang with -flto=thin for cross-language LTO with Rust
+  # Otherwise, use GCC for maximum compatibility
+  if [ "$MUSL_USE_LTO" = "yes" ]; then
+    MUSL_CC="clang"
+    MUSL_AR="llvm-ar"
+    MUSL_RANLIB="llvm-ranlib"
+    MUSL_LTO_FLAGS="-flto=thin"
+    # For linking libc.so with LTO, we need special handling:
+    # 1. The ldso bootstrap has asm→C calls (__dls2, __dls3) that LTO doesn't see
+    # 2. We use --undefined to force the linker to keep these symbols
+    # 3. -fno-lto tells lld to not run LTO optimization on the final link
+    # The LTO bitcode in libc.a is what matters for static linking with Rust
+    MUSL_LDFLAGS="-fuse-ld=lld -fno-lto -Wl,--undefined=__dls2 -Wl,--undefined=__dls3"
+    echo "Building musl with LTO (clang + ThinLTO + lld for cross-language optimization)"
+    echo "Note: libc.so linked without LTO to preserve ldso bootstrap; libc.a has LTO bitcode"
+  else
+    MUSL_CC="gcc"
+    MUSL_AR="ar"
+    MUSL_RANLIB="ranlib"
+    MUSL_LTO_FLAGS=""
+    MUSL_LDFLAGS=""
+  fi
+
+  # Configure musl
   # When USE_MIMALLOC=yes, we don't specify --with-malloc since the patched
   # musl will skip building its native allocator and use our mimalloc objects.
   # When USE_MIMALLOC=no, we explicitly select mallocng for best performance.
   if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
     ./configure \
-      CC="gcc" \
-      CFLAGS="-fno-fast-math" \
+      CC="$MUSL_CC" \
+      AR="$MUSL_AR" \
+      RANLIB="$MUSL_RANLIB" \
+      CFLAGS="-fno-fast-math $MUSL_LTO_FLAGS" \
+      LDFLAGS="$MUSL_LDFLAGS" \
       --prefix="$SYSROOT_PREFIX" \
       --enable-optimize=internal,malloc,string
   else
     ./configure \
-      CC="gcc" \
-      CFLAGS="-fno-fast-math" \
+      CC="$MUSL_CC" \
+      AR="$MUSL_AR" \
+      RANLIB="$MUSL_RANLIB" \
+      CFLAGS="-fno-fast-math $MUSL_LTO_FLAGS" \
+      LDFLAGS="$MUSL_LDFLAGS" \
       --prefix="$SYSROOT_PREFIX" \
       --with-malloc=mallocng \
       --enable-optimize=internal,malloc,string
   fi
 
   # Musl-specific flags for actual compilation
-  MUSL_CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -ffunction-sections -fdata-sections -fno-fast-math -U_FORTIFY_SOURCE -O3"
+  MUSL_CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -ffunction-sections -fdata-sections -fno-fast-math -U_FORTIFY_SOURCE -O3 $MUSL_LTO_FLAGS"
+  
+  # LDSO (dynamic linker) flags - explicitly NO LTO with -fno-lto!
+  # The ldso bootstrap code (dlstart.c) has assembly that calls hidden C functions
+  # (__dls2, __dls3). LTO doesn't see these asm references and eliminates the functions.
+  # CFLAGS_LDSO is ADDED to CFLAGS_ALL in musl's Makefile, so -fno-lto overrides -flto=thin.
+  MUSL_CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -ffunction-sections -fdata-sections -fno-fast-math -U_FORTIFY_SOURCE -O3 -fno-lto"
 
   make -j${JOBS} \
+    CC="$MUSL_CC" \
+    AR="$MUSL_AR" \
+    RANLIB="$MUSL_RANLIB" \
     CFLAGS_AUTO="$MUSL_CFLAGS" \
     CFLAGS_MEMOPS="$MUSL_CFLAGS" \
-    CFLAGS_LDSO="$MUSL_CFLAGS" \
+    CFLAGS_LDSO="$MUSL_CFLAGS_LDSO" \
+    LDFLAGS="$MUSL_LDFLAGS" \
     USE_MIMALLOC=$MUSL_USE_MIMALLOC \
     ADD_CFI=$CFI \
     | tee buildlog.txt
