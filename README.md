@@ -65,7 +65,21 @@ The following versions are pinned/established by this toolchain:
 
 ### Usage
 
-1) Build.
+#### For debian-based distros
+
+You'll need the following packages installed
+
+```bash
+sudo apt install build-essential binutils binutils-dev llvm lld rsync
+```
+
+1) Init submodules.
+
+```bash
+git submodule update --init
+```
+
+2) Build.
 
 ```
 ./build.sh
@@ -100,7 +114,7 @@ Features:
 -----------------------------------------------
 ```
 
-2) In another native build: Set variables and run.
+3) In another native build: Set variables and run.
 
 ```
 export CC=$PWD/latest/x86_64-linux-musl-gcc
@@ -108,9 +122,9 @@ export CC=$PWD/latest/x86_64-linux-musl-gcc
 ./configure --prefix=$PWD/latest
 ```
 
-3) ????
+4) ????
 
-4) PROFIT!
+5) PROFIT!
 
 ```
 > env MIMALLOC_SHOW_STATS=1 ./.dev/artifacts/native/elide/elide --version
