@@ -714,6 +714,7 @@ else
     -DCMAKE_RANLIB="$LLVM_HOST_RANLIB"
     -DCMAKE_C_FLAGS="$LLVM_HOST_CFLAGS"
     -DCMAKE_CXX_FLAGS="$LLVM_HOST_CXXFLAGS"
+    -DLLVM_FORCE_VC_REPOSITORY=https://github.com/llvm/llvm-project.git
   )
   
   # Add LLVMgold.so build if binutils headers available
