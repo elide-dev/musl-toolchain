@@ -46,10 +46,8 @@ SECURE=${SECURE:-OFF}
 GUARDED=${GUARDED:-OFF}
 CFI=${CFI:-no}
 MPK=${MPK:-no}
-# Note: lldb is excluded by default because it requires building liblldb.so (shared),
-# which conflicts with LLVM_ENABLE_PIC=OFF and LLVM_BUILD_STATIC=ON settings.
-# If you need lldb, you must also set LLVM_ENABLE_PIC=ON.
 LLVM_PROJECTS=${LLVM_PROJECTS:-"clang;lld"}
+LLVM_RUNTIMES=${LLVM_RUNTIMES:-"compiler-rt"}
 PREFER_COMPILER_FAMILY=${PREFER_COMPILER_FAMILY:-gcc}
 
 ## Advanced settings.
@@ -729,8 +727,26 @@ else
     )
   fi
 
+  # Per-target runtimes: compiler-rt is cross-built with the just-built clang
+  # against the musl sysroot we already installed via musl-cross-make. The
+  # `RUNTIMES_<target>_` prefix scopes each cmake var into the runtimes
+  # sub-build only — it doesn't leak into the host LLVM compile (which still
+  # builds against glibc).
   cmake ../llvm "${LLVM_CMAKE_ARGS[@]}" \
     -DLLVM_ENABLE_PROJECTS="$LLVM_PROJECTS" \
+    -DLLVM_ENABLE_RUNTIMES="$LLVM_RUNTIMES" \
+    -DLLVM_RUNTIME_TARGETS="$MUSL_TARGET" \
+    -DRUNTIMES_${MUSL_TARGET}_CMAKE_SYSROOT="$SYSROOT_PREFIX/$MUSL_TARGET" \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_BUILTINS=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_PROFILE=ON \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_SANITIZERS=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_LIBFUZZER=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_MEMPROF=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_XRAY=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_ORC=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_CTX_PROFILE=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_BUILD_GWP_ASAN=OFF \
+    -DRUNTIMES_${MUSL_TARGET}_COMPILER_RT_DEFAULT_TARGET_ONLY=ON \
     -DCLANG_TOOL_C_INDEX_TEST_BUILD=OFF \
     -DLLVM_BUILD_32_BITS=OFF \
     -DLLVM_INCLUDE_TESTS=OFF \
