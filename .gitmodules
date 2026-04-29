@@ -83,3 +83,6 @@
 	url = https://github.com/lz4/lz4.git
 	ignore = dirty
 	shallow = true
+[submodule "aws_lc"]
+	path = aws-lc
+	url = git@github.com:aws/aws-lc.git
