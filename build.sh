@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Active versions:
+# - AWS-LC: 1.72.1
 # - Brotli: 1.2.0
 # - CRC32C: 1.1.2
 # - Hiredis: 1.3.0
@@ -23,6 +24,7 @@
 set -e -o pipefail
 
 ## Components.
+BUILD_AWS_LC=${BUILD_AWS_LC:-yes}
 BUILD_BROTLI=${BUILD_BROTLI:-yes}
 BUILD_CAPNP=${BUILD_CAPNP:-no}
 BUILD_CRC32C=${BUILD_CRC32C:-yes}
@@ -161,6 +163,7 @@ echo "Using archiver: $AR"
 
 echo "-----------------------------------------------"
 echo "Musl toolchain:"
+echo "BUILD_AWS_LC=$BUILD_AWS_LC"
 echo "BUILD_BROTLI=$BUILD_BROTLI"
 echo "BUILD_CAPNP=$BUILD_CAPNP"
 echo "BUILD_CRC32C=$BUILD_CRC32C"
@@ -1182,6 +1185,48 @@ else
   popd
 fi
 
+### Build aws-lc
+if [ "$BUILD_AWS_LC" != "yes" ]; then
+  echo "Skipping aws-lc build."
+else
+  echo "------- Building aws-lc..."
+  pushd aws-lc
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    git checkout .
+    git clean -xdf
+    rm -fr build-cmake-static build-cmake-shared
+  fi
+
+  # Pass 1: static libraries (libcrypto.a, libssl.a). PIC is enabled so
+  # the .a archives can also be linked into downstream shared objects.
+  run_cmake . -B build-cmake-static \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DBUILD_LIBSSL=ON \
+    -DBUILD_TOOL=OFF \
+    -DBUILD_TESTING=OFF \
+    -DDISABLE_GO=ON \
+    -DDISABLE_PERL=ON
+
+  cmake --build build-cmake-static -j${JOBS}
+  cmake --install build-cmake-static
+
+  # Pass 2: shared libraries (libcrypto.so, libssl.so), built with the
+  # same embedded clang/musl toolchain so they live alongside the .a files.
+  run_cmake . -B build-cmake-shared \
+    -DBUILD_SHARED_LIBS=ON \
+    -DBUILD_LIBSSL=ON \
+    -DBUILD_TOOL=OFF \
+    -DBUILD_TESTING=OFF \
+    -DDISABLE_GO=ON \
+    -DDISABLE_PERL=ON
+
+  cmake --build build-cmake-shared -j${JOBS}
+  cmake --install build-cmake-shared
+
+  popd
+fi
+
 ### Build sqlite
 if [ "$BUILD_SQLITE" != "yes" ]; then
   echo "Skipping sqlite build."
@@ -1410,6 +1455,10 @@ if [ "$BUILD_ZSTD" = "yes" ]; then
 fi
 if [ "$BUILD_OPENSSL" = "yes" ]; then
   echo "  openssl:    3.6.0 $(file "$SYSROOT_PREFIX/$OPENSSL_LIB_DIR/libssl.a")"
+fi
+if [ "$BUILD_AWS_LC" = "yes" ]; then
+  echo "  aws-lc:     1.72.1 $(file "$SYSROOT_PREFIX/lib/libcrypto.a")"
+  echo "                     $(file "$SYSROOT_PREFIX/lib/libcrypto.so")"
 fi
 if [ "$BUILD_SQLITE" = "yes" ]; then
   echo "  sqlite:     3.51.0 $(file "$SYSROOT_PREFIX/lib/libsqlite3.a")"
