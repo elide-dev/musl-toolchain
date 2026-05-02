@@ -86,3 +86,6 @@
 [submodule "aws_lc"]
 	path = aws-lc
 	url = git@github.com:aws/aws-lc.git
+[submodule "propeller"]
+	path = llvm-propeller
+	url = git@github.com:google/llvm-propeller.git
