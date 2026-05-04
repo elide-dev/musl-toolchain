@@ -170,6 +170,7 @@ echo "BUILD_CRC32C=$BUILD_CRC32C"
 echo "BUILD_HIREDIS=$BUILD_HIREDIS"
 echo "BUILD_LEVELDB=$BUILD_LEVELDB"
 echo "BUILD_LLVM=$BUILD_LLVM"
+echo "BUILD_PROPELLER=$BUILD_PROPELLER"
 echo "BUILD_OPENSSL=$BUILD_OPENSSL"
 echo "BUILD_SNAPPY=$BUILD_SNAPPY"
 echo "BUILD_SQLCIPHER=$BUILD_SQLCIPHER"
@@ -784,6 +785,92 @@ else
   
   sleep 3
   popd
+fi
+
+## Build Propeller before swapping compilers.
+if [ "$BUILD_PROPELLER" != "yes" ]; then
+  echo "Skipping Propeller build."
+else
+  echo "------- Building Propeller..."
+  # Propeller is a HOST tool, same as LLVM. Build it against the host
+  # compiler/glibc, not the musl sysroot we set up earlier — otherwise the
+  # downloaded protobuf's atomics check fails, which trips a real bug in
+  # protobuf 33.4's protobuf-configure-target.cmake.
+  PROPELLER_LLVM_CMAKE_DIR="$(pwd)/llvm/build/lib/cmake/llvm"
+  PROPELLER_PATCH_DIR="$(pwd)/src/patches/llvm-propeller"
+  if [ ! -f "$PROPELLER_LLVM_CMAKE_DIR/LLVMConfig.cmake" ]; then
+    echo "ERROR: $PROPELLER_LLVM_CMAKE_DIR/LLVMConfig.cmake not found."
+    echo "       Build LLVM first (BUILD_LLVM=yes) before building Propeller."
+    exit 1
+  fi
+
+  # Save the musl-targeted environment so we can restore it after.
+  PROP_SAVED_CC="$CC"
+  PROP_SAVED_CXX="$CXX"
+  PROP_SAVED_CFLAGS="$CFLAGS"
+  PROP_SAVED_CXXFLAGS="$CXXFLAGS"
+  PROP_SAVED_LDFLAGS="$LDFLAGS"
+  # Clear environment to prevent musl sysroot contamination of cmake config tests.
+  unset CC CXX CFLAGS CXXFLAGS LDFLAGS
+
+  # Use the exact compiler LLVM was built with — propeller links against
+  # LLVM's static libs, so ABI / libstdc++ versions must match. Reading from
+  # LLVM's CMakeCache.txt also avoids picking up our own musl-targeted clang
+  # via PATH (e.g. via $ROOT_DIR/latest/bin) which would build against musl
+  # and break protobuf's atomics check.
+  PROP_HOST_CC=$(awk -F= '/^CMAKE_C_COMPILER:/{print $2}' "$(pwd)/llvm/build/CMakeCache.txt")
+  PROP_HOST_CXX=$(awk -F= '/^CMAKE_CXX_COMPILER:/{print $2}' "$(pwd)/llvm/build/CMakeCache.txt")
+  if [ -z "$PROP_HOST_CC" ] || [ -z "$PROP_HOST_CXX" ]; then
+    echo "ERROR: could not read CMAKE_C_COMPILER/CMAKE_CXX_COMPILER from llvm/build/CMakeCache.txt"
+    exit 1
+  fi
+  PROP_HOST_CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -O3"
+  PROP_HOST_CXXFLAGS="$PROP_HOST_CFLAGS"
+  echo "Building Propeller with host compiler: $PROP_HOST_CC / $PROP_HOST_CXX"
+
+  pushd llvm-propeller
+  if [ "$CLEAN_BEFORE_BUILD" = "yes" ]; then
+    echo "Cleaning previous proppeller build ..."
+    rm -fr build
+    git checkout .
+    git clean -xdf
+  fi
+  # Re-apply our local propeller patches (find_package(LLVM CONFIG) wiring +
+  # MCContext API fix for LLVM 22) idempotently. The clean step above resets
+  # the submodule, so patches must be re-applied each run.
+  if [ -d "$PROPELLER_PATCH_DIR" ]; then
+    for patch in "$PROPELLER_PATCH_DIR"/*.patch; do
+      [ -e "$patch" ] || continue
+      if git apply --check "$patch" 2>/dev/null; then
+        echo "Applying $(basename "$patch")"
+        git apply "$patch"
+      elif git apply --reverse --check "$patch" 2>/dev/null; then
+        echo "Already applied: $(basename "$patch")"
+      else
+        echo "ERROR: cannot apply patch $patch (and it's not already applied)"
+        exit 1
+      fi
+    done
+  fi
+  cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER="$PROP_HOST_CC" \
+    -DCMAKE_CXX_COMPILER="$PROP_HOST_CXX" \
+    -DCMAKE_C_FLAGS="$PROP_HOST_CFLAGS" \
+    -DCMAKE_CXX_FLAGS="$PROP_HOST_CXXFLAGS" \
+    -DLLVM_DIR="$PROPELLER_LLVM_CMAKE_DIR"
+  pushd build;
+  make -j`nproc`
+  make install
+  popd
+  popd
+
+  # Restore musl-targeted environment for the rest of the script.
+  export CC="$PROP_SAVED_CC"
+  export CXX="$PROP_SAVED_CXX"
+  export CFLAGS="$PROP_SAVED_CFLAGS"
+  export CXXFLAGS="$PROP_SAVED_CXXFLAGS"
+  export LDFLAGS="$PROP_SAVED_LDFLAGS"
 fi
 
 ## Update compilers after LLVM build if using clang
@@ -1437,6 +1524,9 @@ echo "  mimalloc:   3.1.5"
 echo "  libc:       1.2.5+p3 $(file "$SYSROOT_PREFIX/lib/libc.a")"
 if [ "$BUILD_LLVM" = "yes" ]; then
   echo "  llvm:       21.1.2 $(file "$SYSROOT_PREFIX/bin/clang" 2>/dev/null || echo 'not found')"
+fi
+if [ "$BUILD_PROPELLER" = "yes" ]; then
+  echo "  propeller:  trunk"
 fi
 if [ "$BUILD_ZLIB" = "yes" ]; then
   echo "  zlib:       1252e25 (cloudflare@gcc.amd64) $(file "$SYSROOT_PREFIX/lib/libz.a")"

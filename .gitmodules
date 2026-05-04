@@ -86,6 +86,10 @@
 [submodule "aws_lc"]
 	path = aws-lc
 	url = git@github.com:aws/aws-lc.git
+	ignore = dirty
+	shallow = true
 [submodule "propeller"]
 	path = llvm-propeller
 	url = git@github.com:google/llvm-propeller.git
+	ignore = dirty
+	shallow = true

@@ -26,7 +26,7 @@ SECURE=OFF
 GUARDED=OFF
 CFI=no
 MPK=no
-LLVM_PROJECTS="clang;lld;bolt;polly;mlir"
+LLVM_PROJECTS="clang;lld;lldb;bolt;polly"
 
 USE_ZLIB=ng
 USE_SQLITE=vanilla

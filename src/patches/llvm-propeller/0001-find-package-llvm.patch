@@ -1,0 +1,35 @@
+diff --git a/CMake/LLVM/LLVM.cmake b/CMake/LLVM/LLVM.cmake
+index 06df65a..2a5035c 100644
+--- a/CMake/LLVM/LLVM.cmake
++++ b/CMake/LLVM/LLVM.cmake
+@@ -14,6 +14,30 @@
+ # limitations under the License.
+ #
+ # Integrates LLVM into the build.
++#
++# Two modes:
++#   1. Externally-provided LLVM: pass -DLLVM_DIR=/path/to/llvm-build/lib/cmake/llvm
++#      (or -DPROPELLER_LLVM_DIR=...) and propeller will link against that
++#      already-built LLVM via find_package(LLVM CONFIG). No download, no rebuild.
++#   2. Default: download a pinned LLVM snapshot and compile the bits propeller
++#      needs as part of this build (legacy behavior).
++
++# Allow PROPELLER_LLVM_DIR as an alias for LLVM_DIR for clarity at the call site.
++if (DEFINED PROPELLER_LLVM_DIR AND NOT DEFINED LLVM_DIR)
++  set(LLVM_DIR "${PROPELLER_LLVM_DIR}" CACHE PATH "Path to LLVMConfig.cmake" FORCE)
++endif()
++
++if (DEFINED LLVM_DIR AND EXISTS "${LLVM_DIR}/LLVMConfig.cmake")
++  message(STATUS "Propeller: using prebuilt LLVM from ${LLVM_DIR}")
++  find_package(LLVM REQUIRED CONFIG)
++  message(STATUS "Propeller: found LLVM ${LLVM_PACKAGE_VERSION}")
++  include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
++  separate_arguments(_llvm_defs NATIVE_COMMAND "${LLVM_DEFINITIONS}")
++  add_definitions(${_llvm_defs})
++  return()
++endif()
++
++message(STATUS "Propeller: LLVM_DIR not set; falling back to downloading a pinned LLVM snapshot")
+ 
+ # LINT.IfChange(commit_hash)
+ set(_LLVM_HASH 7189c4bb83d90c383741a9480fceca9c7bf74b27)
