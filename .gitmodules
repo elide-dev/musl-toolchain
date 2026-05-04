@@ -85,7 +85,7 @@
 	shallow = true
 [submodule "aws_lc"]
 	path = aws-lc
-	url = git@github.com:aws/aws-lc.git
+	url = https://github.com/aws/aws-lc.git
 	ignore = dirty
 	shallow = true
 [submodule "propeller"]
