@@ -1126,7 +1126,8 @@ else
   LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib" \
   ./configure \
     --prefix="$SYSROOT_PREFIX" \
-    --static
+    --static \
+    --zlib-compat
   make -j${JOBS} CC="$CC_NO_PREFIX" AR="$AR"
   make install
   popd
