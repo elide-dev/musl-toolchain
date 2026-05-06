@@ -90,6 +90,9 @@
 	shallow = true
 [submodule "propeller"]
 	path = llvm-propeller
-	url = https://github.com/google/llvm-propeller.git
+	url = git@github.com:google/llvm-propeller.git
 	ignore = dirty
 	shallow = true
+[submodule "cflags"]
+	path = cflags
+	url = https://github.com/elide-dev/cflags.git
