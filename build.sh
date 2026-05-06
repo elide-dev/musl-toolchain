@@ -1177,18 +1177,40 @@ if [ "$BUILD_STAGE2" = "yes" ]; then
   # Determine compiler and flags for musl build
   # When MUSL_USE_LTO=yes, use clang with -flto=thin for cross-language LTO with Rust
   # Otherwise, use GCC for maximum compatibility
+  #
+  # IMPORTANT (LTO target-triple correctness): with -flto=thin, every musl
+  # object is LLVM bitcode (.lo) and the bitcode embeds the target triple
+  # *baked from the compile command line*. If we invoke a bare `clang`, it
+  # picks up whichever clang resolves first on $PATH, and a system clang
+  # defaults to x86_64-pc-linux-gnu (glibc). When a downstream Rust binary
+  # then LTO-links libc.a, lld warns "Linking two modules of different
+  # target triples: ... is 'x86_64-pc-linux-gnu' whereas ... is
+  # 'x86_64-unknown-linux-musl'" for every libc.a member it pulls in.
+  #
+  # Two defenses below: (1) point at the just-built clang by absolute path
+  # so PATH order doesn't matter, (2) pin the target/sysroot/gcc-toolchain
+  # explicitly so the bitcode triple is always x86_64-(unknown-)linux-musl
+  # regardless of which clang ends up running.
+  MUSL_TARGET_FLAGS=""
   if [ "$MUSL_USE_LTO" = "yes" ]; then
-    MUSL_CC="clang"
+    if [ -x "$SYSROOT_PREFIX/bin/clang" ]; then
+      MUSL_CC="$SYSROOT_PREFIX/bin/clang"
+    else
+      MUSL_CC="clang"
+    fi
     MUSL_AR="llvm-ar"
     MUSL_RANLIB="llvm-ranlib"
-    MUSL_LTO_FLAGS="-flto=thin"
+    MUSL_TARGET_FLAGS="--target=$MUSL_TARGET --sysroot=$SYSROOT_PREFIX --gcc-toolchain=$SYSROOT_PREFIX"
+    MUSL_LTO_FLAGS="-flto=thin $MUSL_TARGET_FLAGS"
     # For linking libc.so with LTO, we need special handling:
     # 1. The ldso bootstrap has asm→C calls (__dls2, __dls3) that LTO doesn't see
     # 2. We use --undefined to force the linker to keep these symbols
     # 3. -fno-lto tells lld to not run LTO optimization on the final link
     # The LTO bitcode in libc.a is what matters for static linking with Rust
-    MUSL_LDFLAGS="-fuse-ld=lld -fno-lto -Wl,--undefined=__dls2 -Wl,--undefined=__dls3"
+    MUSL_LDFLAGS="$MUSL_TARGET_FLAGS -fuse-ld=lld -fno-lto -Wl,--undefined=__dls2 -Wl,--undefined=__dls3"
     echo "Building musl with LTO (clang + ThinLTO + lld for cross-language optimization)"
+    echo "  compiler: $MUSL_CC"
+    echo "  target:   $MUSL_TARGET (pinned via --target/--sysroot)"
     echo "Note: libc.so linked without LTO to preserve ldso bootstrap; libc.a has LTO bitcode"
   else
     MUSL_CC="gcc"
@@ -1207,7 +1229,7 @@ if [ "$BUILD_STAGE2" = "yes" ]; then
       CC="$MUSL_CC" \
       AR="$MUSL_AR" \
       RANLIB="$MUSL_RANLIB" \
-      CFLAGS="-fno-fast-math $MUSL_LTO_FLAGS" \
+      CFLAGS="-fno-fast-math $MUSL_TARGET_FLAGS $MUSL_LTO_FLAGS" \
       LDFLAGS="$MUSL_LDFLAGS" \
       --prefix="$SYSROOT_PREFIX" \
       --enable-optimize=internal,malloc,string
@@ -1216,21 +1238,28 @@ if [ "$BUILD_STAGE2" = "yes" ]; then
       CC="$MUSL_CC" \
       AR="$MUSL_AR" \
       RANLIB="$MUSL_RANLIB" \
-      CFLAGS="-fno-fast-math $MUSL_LTO_FLAGS" \
+      CFLAGS="-fno-fast-math $MUSL_TARGET_FLAGS $MUSL_LTO_FLAGS" \
       LDFLAGS="$MUSL_LDFLAGS" \
       --prefix="$SYSROOT_PREFIX" \
       --with-malloc=mallocng \
       --enable-optimize=internal,malloc,string
   fi
 
-  # Musl-specific flags for actual compilation
+  # Musl-specific flags for actual compilation. MUSL_LTO_FLAGS already
+  # carries MUSL_TARGET_FLAGS (--target/--sysroot/--gcc-toolchain) when LTO
+  # is on; that's what gives every .lo bitcode module the correct target
+  # triple. CFLAGS_LDSO is built without MUSL_LTO_FLAGS (it overrides with
+  # -fno-lto), so we add MUSL_TARGET_FLAGS there explicitly to keep the
+  # ldso .o files driver-consistent — strictly, dropping the LTO portion
+  # for ldso doesn't require this, but it costs nothing and prevents a
+  # PATH-resolved system clang from compiling ldso against glibc headers.
   MUSL_CFLAGS="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -ffunction-sections -fdata-sections -fno-fast-math -U_FORTIFY_SOURCE -O3 $MUSL_LTO_FLAGS"
-  
+
   # LDSO (dynamic linker) flags - explicitly NO LTO with -fno-lto!
   # The ldso bootstrap code (dlstart.c) has assembly that calls hidden C functions
   # (__dls2, __dls3). LTO doesn't see these asm references and eliminates the functions.
   # CFLAGS_LDSO is ADDED to CFLAGS_ALL in musl's Makefile, so -fno-lto overrides -flto=thin.
-  MUSL_CFLAGS_LDSO="-march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -ffunction-sections -fdata-sections -fno-fast-math -U_FORTIFY_SOURCE -O3 -fno-lto"
+  MUSL_CFLAGS_LDSO="$MUSL_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE -ffunction-sections -fdata-sections -fno-fast-math -U_FORTIFY_SOURCE -O3 -fno-lto"
 
   make -j${JOBS} \
     CC="$MUSL_CC" \
