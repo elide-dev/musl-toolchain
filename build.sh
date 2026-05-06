@@ -66,6 +66,17 @@ MAKE_SYMLINK=${MAKE_SYMLINK:-no}
 # that can be optimized together with Rust code at link time.
 MUSL_USE_LTO=${MUSL_USE_LTO:-no}
 
+# Apply the unified Elide cflags profile (cflags/ submodule) to runtime
+# library builds (zlib, openssl, sqlite, …) for flag uniformity across the
+# downstream pipeline. The profile is layered: cflags/<rollup> +
+# cflags.local/<rollup>. Requires PREFER_COMPILER_FAMILY=clang.
+#
+# Only the compile rollup (base → os → os-arch) is applied; the *-bin
+# (final-link) layer is intentionally not used here — its --fatal-warnings
+# and -z defs flags turn legitimate warnings / runtime-resolved undefined
+# symbols into build failures for these deps.
+USE_CFLAGS_PROFILE=${USE_CFLAGS_PROFILE:-yes}
+
 MODERN_X86_64_ARCH_TARGET=x86-64-v3
 MODERN_X86_64_ARCH_TUNE=znver3
 MODERN_AARCH64_ARCH_TARGET=armv8.4-a+crypto+crc
@@ -332,6 +343,120 @@ else
   CLANG_LINK_FLAGS=""
 fi
 
+# ---------------------------------------------------------------------------
+# Unified runtime cflags profile (cflags/ submodule + cflags.local overlay)
+# ---------------------------------------------------------------------------
+# Produces the rolled-up flag set used by every runtime-library build below
+# (zlib, zstd, openssl, sqlite, …). The toolchain layer (musl libc, LLVM,
+# Propeller, mimalloc) is intentionally NOT covered here; those have their
+# own carefully tuned flag sets and the cflags profile would either no-op or
+# break them.
+#
+# Resolution order (last flag wins per clang/gcc precedence):
+#   1. $CLANG_TARGET_FLAGS — pins the build to musl regardless of which
+#      clang gets invoked (defends against system-glibc clang leaking in).
+#   2. cflags/<rollup>     — upstream profile (Elide-wide).
+#   3. cflags.local/<rollup> — local suppressions for third-party noise.
+#   4. -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE — user override of the
+#      profile's hardcoded x86-64-v3 / znver3 baseline.
+#
+# Only the compile rollup is applied — the *-bin layer is excluded entirely
+# (its --fatal-warnings / -z defs would break legitimate runtime-resolved
+# symbols and warnings in our deps).
+
+# Map the build-script's already-canonicalized arch (x86_64/aarch64) back to
+# the cflags submodule's naming (amd64/arm64).
+cflags_arch_name() {
+  case "$ARCH_FLAVOR" in
+    x86_64|amd64)  echo amd64 ;;
+    aarch64|arm64) echo arm64 ;;
+    *) echo "ERROR: cflags profile does not support ARCH_FLAVOR=$ARCH_FLAVOR" >&2; return 1 ;;
+  esac
+}
+
+# Read a flag file: strip end-of-line comments + blank lines, collapse to
+# a single space-separated token list. Identical semantics to the upstream
+# cflags.sh resolver so cflags.local files behave the same way.
+read_flag_file() {
+  local f="$1"
+  if [ -f "$f" ]; then
+    sed -e 's/#.*$//' -e 's/[[:space:]]\{1,\}$//' "$f" \
+      | grep -v '^[[:space:]]*$' \
+      | xargs || true
+  fi
+}
+
+# Resolve the runtime cflags profile (compile rollup only:
+# base → os → os-arch, then cflags.local overlay in the same chain order).
+resolve_runtime_profile() {
+  local cflags_arch
+  cflags_arch="$(cflags_arch_name)" || return 1
+
+  local upstream
+  upstream="$("$ROOT_DIR/cflags/cli/cflags.sh" linux "$cflags_arch")"
+
+  local local_files=(
+    "$ROOT_DIR/cflags.local/base.txt"
+    "$ROOT_DIR/cflags.local/linux.txt"
+    "$ROOT_DIR/cflags.local/linux-${cflags_arch}.txt"
+  )
+  local extra=""
+  for f in "${local_files[@]}"; do
+    local content
+    content="$(read_flag_file "$f")"
+    [ -n "$content" ] && extra="$extra $content"
+  done
+  echo "$upstream$extra"
+}
+
+# Populate profile var once at startup. Empty when disabled, which makes
+# the runtime helpers fall through to the legacy code path automatically.
+RUNTIME_PROFILE_CFLAGS=""
+if [ "$USE_CFLAGS_PROFILE" = "yes" ]; then
+  if [ "$PREFER_COMPILER_FAMILY" != "clang" ]; then
+    echo "ERROR: USE_CFLAGS_PROFILE=yes requires PREFER_COMPILER_FAMILY=clang"
+    echo "       (the upstream profile uses clang-only flags like -Qunused-arguments)"
+    exit 1
+  fi
+  if [ ! -x "$ROOT_DIR/cflags/cli/cflags.sh" ]; then
+    echo "ERROR: cflags submodule not initialized (cflags/cli/cflags.sh missing)."
+    echo "       Run: git submodule update --init cflags"
+    exit 1
+  fi
+  RUNTIME_PROFILE_CFLAGS="$(resolve_runtime_profile)"
+  echo "Runtime cflags profile: enabled (linux/$(cflags_arch_name))"
+fi
+
+# Build the final compile/link flag strings for runtime-library builds.
+# Used by run_cmake_runtime and the autotools call sites below.
+runtime_cc_flags() {
+  if [ "$USE_CFLAGS_PROFILE" = "yes" ]; then
+    # CLANG_TARGET_FLAGS first → pins to musl. Profile next. Then arch
+    # overrides (last-wins) so C_TARGET_ARCH/TUNE env still work.
+    echo "$CLANG_TARGET_FLAGS $RUNTIME_PROFILE_CFLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE"
+  else
+    # Legacy path identical to what each call site used to inline.
+    echo "$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3"
+  fi
+}
+runtime_cxx_flags() {
+  if [ "$USE_CFLAGS_PROFILE" = "yes" ]; then
+    echo "$CLANG_TARGET_FLAGS $RUNTIME_PROFILE_CFLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE"
+  else
+    echo "$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS $SECURITY_CXXFLAGS -O3"
+  fi
+}
+runtime_ld_flags() {
+  if [ "$USE_CFLAGS_PROFILE" = "yes" ]; then
+    # Reuse the compile profile so the linker still sees -fuse-ld=lld and
+    # -Wl,-z,* hardening, but without the aggressive bin-only flags
+    # (--fatal-warnings, -z defs, --gc-sections) that break our deps.
+    echo "$CLANG_LINK_FLAGS $RUNTIME_PROFILE_CFLAGS -L$SYSROOT_PREFIX/lib"
+  else
+    echo "$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib"
+  fi
+}
+
 # For now, use base flags without clang sysroot (toolchain not built yet)
 COMMON_CFLAGS="$BASE_CFLAGS"
 COMMON_CXXFLAGS="$BASE_CXXFLAGS"
@@ -390,6 +515,57 @@ run_cmake() {
     -DCMAKE_EXE_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS $LTO_FLAGS"
     -DCMAKE_SHARED_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS $LTO_FLAGS"
     -DCMAKE_MODULE_LINKER_FLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib $OPT_LDFLAGS $SECURITY_LDFLAGS $LTO_FLAGS"
+  )
+
+  if [ "$USE_SCCACHE" = "yes" ]; then
+    cmake_args+=(
+      -DCMAKE_C_COMPILER_LAUNCHER="$SCCACHE_BIN"
+      -DCMAKE_CXX_COMPILER_LAUNCHER="$SCCACHE_BIN"
+    )
+  fi
+
+  cmake "$source_dir" "${cmake_args[@]}" "${extra_args[@]}"
+}
+
+# CMake helper for runtime-library builds. Identical surface to run_cmake
+# but routes flags through the unified cflags profile (when enabled). Also
+# always re-asserts --target/--sysroot/--gcc-toolchain so the build pins to
+# musl even if a sub-build's cmake auto-detects a system clang.
+run_cmake_runtime() {
+  local source_dir="$1"
+  shift
+  local extra_args=("$@")
+
+  # When the profile is disabled, behave exactly like run_cmake so existing
+  # call sites keep working.
+  if [ "$USE_CFLAGS_PROFILE" != "yes" ]; then
+    run_cmake "$source_dir" "${extra_args[@]}"
+    return $?
+  fi
+
+  local cc_flags
+  local cxx_flags
+  local ld_flags
+  cc_flags="$(runtime_cc_flags)"
+  cxx_flags="$(runtime_cxx_flags)"
+  ld_flags="$(runtime_ld_flags)"
+
+  local cmake_args=(
+    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX"
+    -DCMAKE_C_COMPILER="$CMAKE_C_COMPILER"
+    -DCMAKE_CXX_COMPILER="$CMAKE_CXX_COMPILER"
+    -DCMAKE_AR="$AR"
+    -DCMAKE_C_COMPILER_AR="$AR"
+    -DCMAKE_CXX_COMPILER_AR="$AR"
+    -DCMAKE_RANLIB="$RANLIB"
+    -DCMAKE_C_COMPILER_RANLIB="$RANLIB"
+    -DCMAKE_CXX_COMPILER_RANLIB="$RANLIB"
+    -DCMAKE_C_FLAGS="$cc_flags"
+    -DCMAKE_CXX_FLAGS="$cxx_flags"
+    -DCMAKE_EXE_LINKER_FLAGS="$ld_flags"
+    -DCMAKE_SHARED_LINKER_FLAGS="$ld_flags"
+    -DCMAKE_MODULE_LINKER_FLAGS="$ld_flags"
   )
 
   if [ "$USE_SCCACHE" = "yes" ]; then
@@ -1097,8 +1273,8 @@ else
   fi
 
   CC="$CC_NO_PREFIX" \
-  CFLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-  LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib" \
+  CFLAGS="$(runtime_cc_flags)" \
+  LDFLAGS="$(runtime_ld_flags)" \
   ./configure \
     --prefix="$SYSROOT_PREFIX" \
     --const \
@@ -1122,8 +1298,8 @@ else
   fi
 
   CC="$CC_NO_PREFIX" \
-  CFLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-  LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib" \
+  CFLAGS="$(runtime_cc_flags)" \
+  LDFLAGS="$(runtime_ld_flags)" \
   ./configure \
     --prefix="$SYSROOT_PREFIX" \
     --static \
@@ -1146,7 +1322,7 @@ else
     make clean || echo "Nothing to clean."
   fi
 
-  run_cmake . -B build-cmake \
+  run_cmake_runtime . -B build-cmake \
     -DZSTD_BUILD_SHARED=OFF \
     -DZSTD_BUILD_STATIC=ON \
     -DZSTD_MULTITHREAD_SUPPORT=ON
@@ -1170,7 +1346,7 @@ else
     make clean || echo "Nothing to clean."
   fi
 
-  run_cmake . -B build-cmake \
+  run_cmake_runtime . -B build-cmake \
     -DBUILD_SHARED_LIBS=OFF
 
   cmake --build build-cmake -j${JOBS}
@@ -1194,7 +1370,7 @@ else
   mkdir -p build-cmake
   pushd build-cmake
 
-  run_cmake .. \
+  run_cmake_runtime .. \
     -DSNAPPY_BUILD_TESTS=OFF \
     -DSNAPPY_BUILD_BENCHMARKS=OFF \
     -DBUILD_SHARED_LIBS=OFF
@@ -1222,8 +1398,8 @@ else
     PREFIX="$SYSROOT_PREFIX" \
     CC="$CC_NO_PREFIX" \
     AR="$AR" \
-    CFLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-    LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib" \
+    CFLAGS="$(runtime_cc_flags)" \
+    LDFLAGS="$(runtime_ld_flags)" \
     -j${JOBS}
   make PREFIX="$SYSROOT_PREFIX" install
   popd
@@ -1264,8 +1440,8 @@ else
       --openssldir="$SYSROOT_PREFIX/ssl" \
       CC="$CC_NO_PREFIX" \
       CXX="$CXX_NO_PREFIX" \
-      CFLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3 -fPIE -fPIC" \
-      LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib"
+      CFLAGS="$(runtime_cc_flags) -fPIE -fPIC" \
+      LDFLAGS="$(runtime_ld_flags)"
 
   make -j$JOBS depend
   make -j$JOBS | tee buildlog.txt
@@ -1287,7 +1463,7 @@ else
 
   # Pass 1: static libraries (libcrypto.a, libssl.a). PIC is enabled so
   # the .a archives can also be linked into downstream shared objects.
-  run_cmake . -B build-cmake-static \
+  run_cmake_runtime . -B build-cmake-static \
     -DBUILD_SHARED_LIBS=OFF \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DBUILD_LIBSSL=ON \
@@ -1301,7 +1477,7 @@ else
 
   # Pass 2: shared libraries (libcrypto.so, libssl.so), built with the
   # same embedded clang/musl toolchain so they live alongside the .a files.
-  run_cmake . -B build-cmake-shared \
+  run_cmake_runtime . -B build-cmake-shared \
     -DBUILD_SHARED_LIBS=ON \
     -DBUILD_LIBSSL=ON \
     -DBUILD_TOOL=OFF \
@@ -1329,8 +1505,8 @@ else
   rm -fv buildlog.txt
 
   CC="$CC_NO_PREFIX" \
-  CFLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-  LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib" \
+  CFLAGS="$(runtime_cc_flags)" \
+  LDFLAGS="$(runtime_ld_flags)" \
   ./configure \
     --prefix="$SYSROOT_PREFIX" \
     --enable-all \
@@ -1360,8 +1536,8 @@ else
   rm -fv buildlog.txt
 
   CC="$CC_NO_PREFIX" \
-  CFLAGS="$CLANG_TARGET_FLAGS -DSQLITE_HAS_CODEC -DSQLITE_EXTRA_INIT=sqlcipher_extra_init -DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-  LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib -lcrypto $OPT_LDFLAGS $SECURITY_LDFLAGS" \
+  CFLAGS="$(runtime_cc_flags) -DSQLITE_HAS_CODEC -DSQLITE_EXTRA_INIT=sqlcipher_extra_init -DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown" \
+  LDFLAGS="$(runtime_ld_flags) -lcrypto" \
   ./configure \
     --prefix="$SYSROOT_PREFIX/sqlcipher" \
     --enable-all \
@@ -1391,9 +1567,9 @@ else
   autoreconf -i
   CC="$CC_NO_PREFIX" \
   CXX="$CXX_NO_PREFIX" \
-  CFLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-  CXXFLAGS="$CLANG_TARGET_FLAGS -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS $SECURITY_CXXFLAGS -O3" \
-  LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib" \
+  CFLAGS="$(runtime_cc_flags)" \
+  CXXFLAGS="$(runtime_cxx_flags)" \
+  LDFLAGS="$(runtime_ld_flags)" \
   ./configure \
     --prefix="$SYSROOT_PREFIX" \
     --with-zlib \
@@ -1420,8 +1596,8 @@ else
     USE_SSL=1 \
     CC="$CC_NO_PREFIX" \
     AR="$AR" \
-    CFLAGS="$CLANG_TARGET_FLAGS -Wno-error=stringop-overflow -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE $OPT_CFLAGS $SECURITY_CFLAGS -O3" \
-    LDFLAGS="$CLANG_LINK_FLAGS -L$SYSROOT_PREFIX/lib" \
+    CFLAGS="$(runtime_cc_flags)" \
+    LDFLAGS="$(runtime_ld_flags)" \
     PREFIX="$SYSROOT_PREFIX" \
     OPTIMIZATION=-O3 \
     static pkgconfig install \
@@ -1445,7 +1621,7 @@ else
   mkdir -p build
   pushd build
 
-  run_cmake .. \
+  run_cmake_runtime .. \
     -DBUILD_SHARED_LIBS=0 \
     -DCRC32C_BUILD_TESTS=0 \
     -DCRC32C_BUILD_BENCHMARKS=0
@@ -1471,7 +1647,7 @@ else
   mkdir -p build
   pushd build
 
-  run_cmake .. \
+  run_cmake_runtime .. \
     -DBUILD_SHARED_LIBS=OFF \
     -DLEVELDB_BUILD_TESTS=OFF \
     -DLEVELDB_BUILD_BENCHMARKS=OFF

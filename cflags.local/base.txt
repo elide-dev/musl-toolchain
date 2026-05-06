@@ -1,0 +1,40 @@
+# Local cflags overlay for the musl toolchain dependency build.
+# Layered on top of `../cflags/base.txt` after the rolled-up profile.
+# Last flag wins for clang/gcc, so anything here overrides the upstream.
+#
+# Rationale: the upstream cflags profile is tuned for Elide's first-party
+# native code (Netty JNI, Netty TCNative). Third-party C in our runtime-lib
+# pipeline (zlib, openssl, sqlite, capnp, leveldb, …) is older / written
+# pre-C2x / does not target -Wpedantic, so several of the upstream
+# diagnostics produce noise we cannot fix upstream. Suppress them here so
+# the build log stays signal-rich and `-Wno-error=…` upstream gates do not
+# become surprise failures.
+
+# Strict-ISO complaints are too noisy on legacy autoconf C (sqlite, hiredis).
+-Wno-pedantic
+
+# -Wextra escalations that misfire on third-party code:
+-Wno-unused-parameter
+-Wno-sign-compare
+
+# Most third-party C drops const for compatibility shims or does pointer
+# casts the standard would technically flag. We do not own these sources,
+# so the warnings are not actionable.
+-Wno-cast-qual
+-Wno-cast-align
+
+# Variable shadowing is endemic in the older C codebases here (sqlite in
+# particular). Re-enable per-target if needed.
+-Wno-shadow
+
+# Older code uses #if FOO with FOO undefined (treated as 0) deliberately.
+-Wno-undef
+
+# K&R-style () declarations show up in autoconf conftests and a few legacy
+# headers; clang treats them as a warning even on C23 sources.
+-Wno-strict-prototypes
+
+# Switch-table heuristics that assume modern C semantics:
+-Wno-implicit-fallthrough
+-Wno-switch-default
+-Wno-switch-enum
