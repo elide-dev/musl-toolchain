@@ -882,7 +882,6 @@ else
     echo "WARNING: binutils plugin-api.h not found - LLVMgold.so will not be built"
     echo "         Install binutils-dev/binutils-devel to enable GNU ld LTO support"
   fi
-  
   LLVM_CMAKE_ARGS=(
     -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_INSTALL_PREFIX="$SYSROOT_PREFIX"
@@ -892,6 +891,31 @@ else
     -DCMAKE_RANLIB="$LLVM_HOST_RANLIB"
     -DCMAKE_C_FLAGS="$LLVM_HOST_CFLAGS"
     -DCMAKE_CXX_FLAGS="$LLVM_HOST_CXXFLAGS"
+    # ---- LLVM C++ runtime (libc++ / libc++abi / libunwind), cross-built
+    # for the musl target. compiler-rt provides builtins; libc++abi uses
+    # libunwind (LLVM's, not GCC's libgcc_eh) for the personality routine.
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXX_HAS_MUSL_LIBC=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXX_USE_COMPILER_RT=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXXABI_USE_COMPILER_RT=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXXABI_USE_LLVM_UNWINDER=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXXABI_ENABLE_STATIC_UNWINDER=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBUNWIND_USE_COMPILER_RT=ON
+    # Static-only across all three libs — the toolchain's deployment target
+    # is fully-static musl binaries, so no .so flavours are needed. Skipping
+    # the shared builds also dodges libunwind's
+    #   "Compiler doesn't support generation of unwind tables if exception
+    #    support is disabled. Building libunwind DSO with runtime dependency
+    #    on C++ ABI library is not supported."
+    # error from libunwind/src/CMakeLists.txt that fires when the cross-target
+    # sysroot can't compile the `-fno-exceptions -funwind-tables` probe.
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXX_ENABLE_SHARED=OFF
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXX_ENABLE_STATIC=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXXABI_ENABLE_SHARED=OFF
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXXABI_ENABLE_STATIC=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBUNWIND_ENABLE_SHARED=OFF
+    -DRUNTIMES_${MUSL_TARGET}_LIBUNWIND_ENABLE_STATIC=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXX_ENABLE_THREADS=ON
+    -DRUNTIMES_${MUSL_TARGET}_LIBCXX_HARDENING_MODE=fast
     -DLLVM_FORCE_VC_REPOSITORY=https://github.com/llvm/llvm-project.git
   )
   
