@@ -726,84 +726,13 @@ else
   export CXX="$CXX_NO_PREFIX"
 fi
 
-## Build mimalloc
-echo "------- Building mimalloc..."
-pushd mimalloc
-rm -fr out/release
-mkdir -p out/release
-pushd out/release
-
-# When integrating mimalloc into musl libc, we must disable MI_OVERRIDE
-# to prevent symbol conflicts (strdup, strndup, valloc, etc.)
-# Our glue code will provide the redirections instead.
-if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
-  MI_OVERRIDE_SETTING="OFF"
-  echo "Building mimalloc for musl integration (MI_OVERRIDE=OFF)"
-else
-  MI_OVERRIDE_SETTING="ON"
-  echo "Building mimalloc standalone (MI_OVERRIDE=ON)"
-fi
-
-run_cmake ../.. \
-  -DMI_SECURE=$SECURE \
-  -DMI_GUARDED=$GUARDED \
-  -DMI_OPT_ARCH=ON \
-  -DMI_SEE_ASM=ON \
-  -DMI_LIBC_MUSL=ON \
-  -DMI_BUILD_SHARED=OFF \
-  -DMI_BUILD_STATIC=ON \
-  -DMI_BUILD_OBJECT=ON \
-  -DMI_BUILD_TESTS=OFF \
-  -DMI_OVERRIDE=$MI_OVERRIDE_SETTING \
-  -DMI_EXTRA_CPPDEFS="MI_DEFAULT_ARENA_RESERVE=33554432;MI_DEFAULT_ALLOW_LARGE_OS_PAGES=0" \
-  -DMI_SKIP_COLLECT_ON_EXIT=1
-
-make -j${JOBS} | tee buildlog.txt
-make install
-popd
-popd
-echo "Mimalloc done."
-
-# Build mimalloc-musl glue code if integration is enabled
-if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
-  echo "------- Building mimalloc-musl glue code..."
-  
-  GLUE_SRC="$ROOT_DIR/src/mimalloc-musl-glue.c"
-  GLUE_OBJ="$ROOT_DIR/mimalloc/out/release/mimalloc-musl-glue.o"
-  MIMALLOC_INCLUDE="$ROOT_DIR/mimalloc/include"
-  
-  if [ ! -f "$GLUE_SRC" ]; then
-    echo "ERROR: mimalloc-musl-glue.c not found at $GLUE_SRC"
-    echo "This file is required for MUSL_USE_MIMALLOC=yes"
-    exit 1
-  fi
-  
-  # LTO flags for cross-language optimization (must match musl build)
-  GLUE_LTO_FLAGS=""
-  if [ "$MUSL_USE_LTO" = "yes" ]; then
-    GLUE_LTO_FLAGS="-flto=thin"
-  fi
-  
-  # Compile glue code with same flags as mimalloc, plus musl and mimalloc headers
-  # CLANG_TARGET_FLAGS contains sysroot/gcc-toolchain for clang, empty for gcc
-  $CC_NO_PREFIX -c -O3 -fPIC \
-    $CLANG_TARGET_FLAGS \
-    $GLUE_LTO_FLAGS \
-    -fno-fast-math -U_FORTIFY_SOURCE \
-    -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE \
-    -ffunction-sections -fdata-sections \
-    -I"$MIMALLOC_INCLUDE" \
-    -I"$SYSROOT_PREFIX/include" \
-    "$GLUE_SRC" \
-    -o "$GLUE_OBJ"
-  
-  if [ ! -f "$GLUE_OBJ" ]; then
-    echo "ERROR: Failed to compile mimalloc-musl-glue.c"
-    exit 1
-  fi
-  
-  echo "Glue code compiled: $GLUE_OBJ"
-fi
+## NOTE: mimalloc + mimalloc-musl-glue are intentionally built AFTER LLVM
+## stage 1 (further down) so they use the toolchain's own clang. If they
+## ran here, CMAKE_C_COMPILER / CC_NO_PREFIX would still point at the
+## system clang (PATH-resolved), and on hosts whose system LLVM is newer
+## than this toolchain's the emitted LTO bitcode would carry a summary
+## version that the toolchain's own ld.lld (and rust-lld downstream)
+## refuses to read — failing the libc.so link at musl phase 2.
 
 ### Build LLVM
 if [ "$BUILD_LLVM" != "yes" ]; then
@@ -1130,6 +1059,91 @@ if [ "$USE_SCCACHE" = "yes" ]; then
 else
   export CC="$CC_NO_PREFIX"
   export CXX="$CXX_NO_PREFIX"
+fi
+
+## Build mimalloc
+## Deferred until after LLVM stage 1 + post-LLVM compiler reassignment so
+## CMAKE_C_COMPILER points at the toolchain's own clang. Building mimalloc
+## with the system clang (PATH-resolved) on hosts whose system LLVM is
+## newer than this toolchain emits LTO bitcode at a summary version the
+## toolchain's ld.lld + rust-lld refuse — which fails the libc.so link
+## below at musl phase 2.
+echo "------- Building mimalloc..."
+pushd mimalloc
+rm -fr out/release
+mkdir -p out/release
+pushd out/release
+
+# When integrating mimalloc into musl libc, we must disable MI_OVERRIDE
+# to prevent symbol conflicts (strdup, strndup, valloc, etc.)
+# Our glue code will provide the redirections instead.
+if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
+  MI_OVERRIDE_SETTING="OFF"
+  echo "Building mimalloc for musl integration (MI_OVERRIDE=OFF)"
+else
+  MI_OVERRIDE_SETTING="ON"
+  echo "Building mimalloc standalone (MI_OVERRIDE=ON)"
+fi
+
+run_cmake ../.. \
+  -DMI_SECURE=$SECURE \
+  -DMI_GUARDED=$GUARDED \
+  -DMI_OPT_ARCH=ON \
+  -DMI_SEE_ASM=ON \
+  -DMI_LIBC_MUSL=ON \
+  -DMI_BUILD_SHARED=OFF \
+  -DMI_BUILD_STATIC=ON \
+  -DMI_BUILD_OBJECT=ON \
+  -DMI_BUILD_TESTS=OFF \
+  -DMI_OVERRIDE=$MI_OVERRIDE_SETTING \
+  -DMI_EXTRA_CPPDEFS="MI_DEFAULT_ARENA_RESERVE=33554432;MI_DEFAULT_ALLOW_LARGE_OS_PAGES=0" \
+  -DMI_SKIP_COLLECT_ON_EXIT=1
+
+make -j${JOBS} | tee buildlog.txt
+make install
+popd
+popd
+echo "Mimalloc done."
+
+# Build mimalloc-musl glue code if integration is enabled
+if [ "$MUSL_USE_MIMALLOC" = "yes" ]; then
+  echo "------- Building mimalloc-musl glue code..."
+
+  GLUE_SRC="$ROOT_DIR/src/mimalloc-musl-glue.c"
+  GLUE_OBJ="$ROOT_DIR/mimalloc/out/release/mimalloc-musl-glue.o"
+  MIMALLOC_INCLUDE="$ROOT_DIR/mimalloc/include"
+
+  if [ ! -f "$GLUE_SRC" ]; then
+    echo "ERROR: mimalloc-musl-glue.c not found at $GLUE_SRC"
+    echo "This file is required for MUSL_USE_MIMALLOC=yes"
+    exit 1
+  fi
+
+  # LTO flags for cross-language optimization (must match musl build)
+  GLUE_LTO_FLAGS=""
+  if [ "$MUSL_USE_LTO" = "yes" ]; then
+    GLUE_LTO_FLAGS="-flto=thin"
+  fi
+
+  # Compile glue code with same flags as mimalloc, plus musl and mimalloc headers
+  # CLANG_TARGET_FLAGS contains sysroot/gcc-toolchain for clang, empty for gcc
+  $CC_NO_PREFIX -c -O3 -fPIC \
+    $CLANG_TARGET_FLAGS \
+    $GLUE_LTO_FLAGS \
+    -fno-fast-math -U_FORTIFY_SOURCE \
+    -march=$C_TARGET_ARCH -mtune=$C_TARGET_TUNE \
+    -ffunction-sections -fdata-sections \
+    -I"$MIMALLOC_INCLUDE" \
+    -I"$SYSROOT_PREFIX/include" \
+    "$GLUE_SRC" \
+    -o "$GLUE_OBJ"
+
+  if [ ! -f "$GLUE_OBJ" ]; then
+    echo "ERROR: Failed to compile mimalloc-musl-glue.c"
+    exit 1
+  fi
+
+  echo "Glue code compiled: $GLUE_OBJ"
 fi
 
 ## Build musl (phase 2 + mimalloc)
